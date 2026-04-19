@@ -6,7 +6,8 @@ Gem::Specification.new do |spec|
   spec.summary = "Vagrant provider for AVF on Apple Silicon Macs"
   spec.description = "A lean Vagrant provider for Apple Silicon Macs using Apple's Virtualization Framework (AVF)."
   spec.homepage = "https://github.com/sodini-io/vagrant-provider-avf"
-  spec.authors = ["Contributors"]
+  spec.authors = ["James Sodini"]
+  spec.email = ["james@sodini.io"]
   spec.license = "MIT"
   spec.files = Dir["lib/**/*", "LICENSE", "NOTICE", "README.md"]
   spec.require_paths = ["lib"]
@@ -14,6 +15,9 @@ Gem::Specification.new do |spec|
   spec.metadata = {
     "source_code_uri" => "https://github.com/sodini-io/vagrant-provider-avf",
     "homepage_uri" => "https://github.com/sodini-io/vagrant-provider-avf",
+    "documentation_uri" => "https://github.com/sodini-io/vagrant-provider-avf#readme",
+    "bug_tracker_uri" => "https://github.com/sodini-io/vagrant-provider-avf/issues",
+    "changelog_uri" => "https://github.com/sodini-io/vagrant-provider-avf/releases",
     "allowed_push_host" => "https://rubygems.org",
     "rubygems_mfa_required" => "true"
   }
