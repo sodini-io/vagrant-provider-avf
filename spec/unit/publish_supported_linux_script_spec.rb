@@ -12,9 +12,11 @@ RSpec.describe "scripts/publish-supported-linux" do
   let(:confidence_log) { tmpdir.join("confidence.log") }
   let(:curl_log) { tmpdir.join("curl.log") }
   let(:curl_body) { tmpdir.join("curl.json") }
+  let(:sync_log) { tmpdir.join("sync.log") }
   let(:fake_publish_box) { tmpdir.join("publish-box") }
   let(:fake_release_confidence) { tmpdir.join("release-confidence") }
   let(:fake_curl) { tmpdir.join("curl") }
+  let(:fake_sync_cloud_box_metadata) { tmpdir.join("sync-cloud-box-metadata") }
 
   before do
     write_executable(fake_publish_box, <<~SH)
@@ -35,6 +37,12 @@ RSpec.describe "scripts/publish-supported-linux" do
       printf '%s\\n' "$*" >> "#{curl_log}"
       cat "#{curl_body}"
     SH
+
+    write_executable(fake_sync_cloud_box_metadata, <<~SH)
+      #!/usr/bin/env bash
+      set -euo pipefail
+      printf '%s\\n' "$*" >> "#{sync_log}"
+    SH
   end
 
   after do
@@ -46,6 +54,13 @@ RSpec.describe "scripts/publish-supported-linux" do
 
     expect(status.success?).to be(true), stderr
     expect(confidence_log.read).to eq("ran\n")
+    expect(sync_log.read.lines(chomp: true)).to eq(
+      [
+        "--org sodini-io --family ubuntu",
+        "--org sodini-io --family almalinux",
+        "--org sodini-io --family rocky"
+      ]
+    )
     expect(publish_log.read.lines(chomp: true)).to eq(
       [
         "sodini-io/ubuntu-24.04-arm64 0.1.0 #{repo_root}/build/boxes/avf-ubuntu-24.04-arm64-0.1.0.box",
@@ -67,6 +82,11 @@ RSpec.describe "scripts/publish-supported-linux" do
     stdout, stderr, status = run_script("0.1.0", "--family", "ubuntu", "--release", "--skip-confidence")
 
     expect(status.success?).to be(true), stderr
+    expect(sync_log.read.lines(chomp: true)).to eq(
+      [
+        "--org sodini-io --family ubuntu"
+      ]
+    )
     expect(publish_log.read.lines(chomp: true)).to eq(
       [
         "sodini-io/ubuntu-24.04-arm64 0.1.0 #{repo_root}/build/boxes/avf-ubuntu-24.04-arm64-0.1.0.box --release"
@@ -94,6 +114,7 @@ RSpec.describe "scripts/publish-supported-linux" do
     env = {
       "AVF_PUBLISH_BOX_COMMAND" => fake_publish_box.to_s,
       "AVF_RELEASE_CONFIDENCE_COMMAND" => fake_release_confidence.to_s,
+      "AVF_SYNC_CLOUD_BOX_METADATA_COMMAND" => fake_sync_cloud_box_metadata.to_s,
       "PATH" => "#{tmpdir}:#{ENV.fetch("PATH")}"
     }
 

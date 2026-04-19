@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: scripts/sync-cloud-box-metadata [--family FAMILY] [--org ORGANIZATION]
+
+Creates or updates the supported Linux cloud box entries with standard
+descriptions that point back to the vagrant-provider-avf source repository.
+
+Defaults:
+  ORGANIZATION=sodini-io
+
+Examples:
+  scripts/sync-cloud-box-metadata
+  scripts/sync-cloud-box-metadata --family ubuntu
+  scripts/sync-cloud-box-metadata --org myorg --family rocky
+EOF
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+organization="sodini-io"
+families=()
+
+require_auth() {
+  if [[ -n "${VAGRANT_CLOUD_TOKEN:-}" ]]; then
+    return
+  fi
+
+  if [[ -n "${HCP_CLIENT_ID:-}" && -n "${HCP_CLIENT_SECRET:-}" ]]; then
+    return
+  fi
+
+  printf 'cloud box auth is not configured: set VAGRANT_CLOUD_TOKEN or both HCP_CLIENT_ID and HCP_CLIENT_SECRET\n' >&2
+  exit 1
+}
+
+validate_family() {
+  case "$1" in
+    ubuntu | almalinux | rocky) ;;
+    *)
+      printf 'unsupported family: %s\n' "$1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+slug_for() {
+  case "$1" in
+    ubuntu) echo "ubuntu-24.04-arm64" ;;
+    almalinux) echo "almalinux-9-arm64" ;;
+    rocky) echo "rocky-9-arm64" ;;
+  esac
+}
+
+selected_families() {
+  if [[ "${#families[@]}" -eq 0 ]]; then
+    printf 'ubuntu\nalmalinux\nrocky\n'
+    return
+  fi
+
+  printf '%s\n' "${families[@]}"
+}
+
+metadata_json() {
+  ruby -I"${repo_root}/lib" -rjson -r vagrant_provider_avf/cloud_box_metadata -e '
+    metadata = VagrantPlugins::AVF::CloudBoxMetadata.new(ARGV[0]).validate!
+    puts JSON.generate(
+      short_description: metadata.short_description,
+      description: metadata.description
+    )
+  ' "$1"
+}
+
+sync_family() {
+  local family="$1"
+  local slug
+  local box_name
+  local metadata
+  local short_description
+  local description
+
+  slug="$(slug_for "${family}")"
+  box_name="${organization}/${slug}"
+  metadata="$(metadata_json "${box_name}")"
+  short_description="$(ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("short_description")' <<<"${metadata}")"
+  description="$(ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("description")' <<<"${metadata}")"
+
+  if vagrant cloud box show "${box_name}" >/dev/null 2>&1; then
+    vagrant cloud box update "${box_name}" --short-description "${short_description}" --description "${description}"
+    printf 'updated %s metadata\n' "${box_name}"
+    return
+  fi
+
+  vagrant cloud box create "${box_name}" --short-description "${short_description}" --description "${description}"
+  printf 'created %s metadata\n' "${box_name}"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --family)
+      shift
+      [[ $# -gt 0 ]] || {
+        usage
+        exit 1
+      }
+      validate_family "$1"
+      families+=("$1")
+      ;;
+    --org)
+      shift
+      [[ $# -gt 0 ]] || {
+        usage
+        exit 1
+      }
+      organization="$1"
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+require_auth
+
+while IFS= read -r family; do
+  sync_family "${family}"
+done < <(selected_families)

@@ -126,6 +126,18 @@ scripts/publish-supported-linux 0.1.0 --family ubuntu --release
 ```
 
 That defaults to the `sodini-io` organization, runs `scripts/release-confidence` unless `--skip-confidence` is set, and can publish Ubuntu, AlmaLinux, and Rocky in rollout order.
+It also syncs the public box descriptions first, so the registry entries point back to the source repo:
+
+- [https://github.com/sodini-io/vagrant-provider-avf](https://github.com/sodini-io/vagrant-provider-avf)
+
+The provider plugin itself is a separate RubyGems release. To publish the current gem version:
+
+```bash
+export GEM_HOST_API_KEY="..."
+scripts/publish-gem
+```
+
+That builds the current `vagrant-provider-avf` gem under `build/gems/`, runs `scripts/release-confidence` by default, and pushes the gem to RubyGems.org.
 
 Today the publish path is intentionally limited to:
 

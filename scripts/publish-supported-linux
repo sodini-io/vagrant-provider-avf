@@ -26,6 +26,7 @@ repo_root="$(cd "${script_dir}/.." && pwd)"
 
 publish_box_command="${AVF_PUBLISH_BOX_COMMAND:-${repo_root}/scripts/publish-box}"
 release_confidence_command="${AVF_RELEASE_CONFIDENCE_COMMAND:-${repo_root}/scripts/release-confidence}"
+sync_cloud_box_metadata_command="${AVF_SYNC_CLOUD_BOX_METADATA_COMMAND:-${repo_root}/scripts/sync-cloud-box-metadata}"
 api_wait_attempts="${AVF_PUBLISH_WAIT_ATTEMPTS:-15}"
 api_wait_seconds="${AVF_PUBLISH_WAIT_SECONDS:-2}"
 
@@ -136,6 +137,7 @@ publish_family() {
 
   [[ "${release_flag}" -eq 1 ]] && command+=(--release)
 
+  "${sync_cloud_box_metadata_command}" --org "${organization}" --family "${family}"
   "${command[@]}"
 
   if [[ "${release_flag}" -eq 1 ]]; then

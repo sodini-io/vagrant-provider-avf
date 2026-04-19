@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: scripts/publish-gem [--skip-confidence] [--otp CODE]
+
+Builds the current vagrant-provider-avf gem into build/gems/ and pushes it to
+RubyGems.org.
+
+Auth:
+  - GEM_HOST_API_KEY
+  - or a configured ~/.gem/credentials entry
+
+Examples:
+  scripts/publish-gem
+  scripts/publish-gem --skip-confidence
+  scripts/publish-gem --otp 123456
+EOF
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+release_confidence_command="${AVF_RELEASE_CONFIDENCE_COMMAND:-${repo_root}/scripts/release-confidence}"
+gem_output_dir="${repo_root}/build/gems"
+run_confidence=1
+otp_code=""
+
+gem_credentials_file() {
+  if [[ -n "${XDG_CONFIG_HOME:-}" ]]; then
+    printf '%s/gem/credentials\n' "${XDG_CONFIG_HOME}"
+    return
+  fi
+
+  printf '%s/.gem/credentials\n' "${HOME}"
+}
+
+require_auth() {
+  if [[ -n "${GEM_HOST_API_KEY:-}" ]]; then
+    return
+  fi
+
+  if [[ -f "$(gem_credentials_file)" ]]; then
+    return
+  fi
+
+  printf 'RubyGems auth is not configured: set GEM_HOST_API_KEY or run gem signin first\n' >&2
+  exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --skip-confidence)
+      run_confidence=0
+      ;;
+    --otp)
+      shift
+      [[ $# -gt 0 ]] || {
+        usage
+        exit 1
+      }
+      otp_code="$1"
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+require_auth
+
+if [[ "${run_confidence}" -eq 1 ]]; then
+  "${release_confidence_command}"
+fi
+
+version="$(cd "${repo_root}" && ruby -I lib -e 'require "vagrant_provider_avf/version"; print VagrantPlugins::AVF::VERSION')"
+artifact_path="${gem_output_dir}/vagrant-provider-avf-${version}.gem"
+
+mkdir -p "${gem_output_dir}"
+(cd "${repo_root}" && gem build vagrant-provider-avf.gemspec --output "${artifact_path}" >/dev/null)
+
+push_command=(gem push "${artifact_path}")
+[[ -n "${otp_code}" ]] && push_command+=(--otp "${otp_code}")
+"${push_command[@]}"
+
+printf 'published %s to RubyGems.org\n' "$(basename "${artifact_path}")"

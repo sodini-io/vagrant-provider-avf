@@ -1,6 +1,9 @@
 # Releasing Boxes
 
-This repo can build and publish local `.box` artifacts for the `avf` provider.
+This repo ships two separate release artifacts:
+
+- the `vagrant-provider-avf` Ruby gem
+- the Linux `.box` artifacts for the `avf` provider
 
 Use this guide only after the fast suite and the relevant guest-specific acceptance workflow are green.
 The current support matrix is in [docs/guest-support.md](/Users/jim/Code/vagrant-provider-avf/docs/guest-support.md).
@@ -11,8 +14,25 @@ The current support matrix is in [docs/guest-support.md](/Users/jim/Code/vagrant
 - authenticated for your target registry using one of:
   - `HCP_CLIENT_ID` and `HCP_CLIENT_SECRET`
   - `VAGRANT_CLOUD_TOKEN`
+- a RubyGems.org account if you are publishing the plugin gem
 - a verified box artifact under `build/boxes/`
 - the relevant guest workflow already tested locally
+
+RubyGems release guidance:
+
+- create an account at [RubyGems.org](https://rubygems.org)
+- enable MFA for the account
+- create an API key with push scope, or use `gem signin`
+- export `GEM_HOST_API_KEY` or let RubyGems use your saved credentials
+
+The current gemspec opts into RubyGems MFA requirement and restricts pushes to `https://rubygems.org`.
+
+Official references:
+
+- [Publishing your gem](https://guides.rubygems.org/publishing/)
+- [Setting up multi-factor authentication](https://guides.rubygems.org/setting-up-multifactor-authentication/)
+- [API key scopes](https://guides.rubygems.org/api-key-scopes/)
+- [MFA requirement opt-in](https://guides.rubygems.org/mfa-requirement-opt-in/)
 
 If your old Vagrant Cloud organization has been migrated, claim it in HCP first:
 
@@ -92,6 +112,40 @@ The current official migration and auth details are here:
 
 ## Build And Verify First
 
+Before publishing anything public, run:
+
+```bash
+scripts/release-confidence
+```
+
+That rebuilds the supported Linux `.box` artifacts from the current checkout, runs the fast suite, and runs the full supported Linux system matrix.
+
+## Publish The Plugin Gem
+
+Use a RubyGems.org account and either:
+
+- `GEM_HOST_API_KEY`
+- or `gem signin`
+
+Then publish the current project gem:
+
+```bash
+export GEM_HOST_API_KEY="..."
+scripts/publish-gem
+```
+
+If your RubyGems API key requires OTP for pushes, pass it through:
+
+```bash
+scripts/publish-gem --otp 123456
+```
+
+That script:
+
+- runs `scripts/release-confidence` unless `--skip-confidence` is set
+- builds `build/gems/vagrant-provider-avf-<version>.gem`
+- pushes the gem to RubyGems.org
+
 Ubuntu:
 
 ```bash
@@ -117,14 +171,6 @@ scripts/ci-rocky-acceptance
 ```
 
 Only publish artifacts that passed their intended workflow.
-
-For a single repo-level confidence gate before publishing anything, run:
-
-```bash
-scripts/release-confidence
-```
-
-That rebuilds the supported Linux `.box` artifacts from the current checkout, runs the fast suite, and runs the full supported Linux system matrix.
 
 ## Publish An Unreleased Version
 
@@ -161,8 +207,17 @@ That script:
 - defaults to `sodini-io`
 - runs `scripts/release-confidence` unless `--skip-confidence` is set
 - can target `ubuntu`, `almalinux`, or `rocky`
+- syncs the cloud box descriptions before publishing, including the source repo URL
 - stages unreleased versions by default
 - waits for the registry API to show the `avf` provider when `--release` is used
+
+If you want to sync the public box descriptions without publishing a version yet:
+
+```bash
+export HCP_CLIENT_ID="..."
+export HCP_CLIENT_SECRET="..."
+scripts/sync-cloud-box-metadata
+```
 
 By default the wrapper only allows supported Linux targets through:
 
@@ -176,11 +231,12 @@ Unknown targets are blocked until they are added deliberately to the release mat
 
 The lowest-risk upstream sequence is:
 
-1. publish Ubuntu first as an unreleased version
-2. verify it from a clean `VAGRANT_HOME` using `vagrant box add` and `vagrant up`
-3. release the Ubuntu version once that registry-hosted install path is green
-4. repeat the same unreleased-then-release flow for AlmaLinux
-5. repeat it for Rocky Linux
+1. publish the `vagrant-provider-avf` gem first
+2. publish Ubuntu as an unreleased version
+3. verify it from a clean `VAGRANT_HOME` using `vagrant plugin install vagrant-provider-avf`, `vagrant box add`, and `vagrant up`
+4. release the Ubuntu version once that registry-hosted install path is green
+5. repeat the same unreleased-then-release flow for AlmaLinux
+6. repeat it for Rocky Linux
 
 Why this order:
 
