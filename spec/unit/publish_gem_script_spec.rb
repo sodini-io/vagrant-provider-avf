@@ -76,7 +76,10 @@ RSpec.describe "scripts/publish-gem" do
   def run_script(*args, auth: true)
     env = {
       "AVF_RELEASE_CONFIDENCE_COMMAND" => fake_release_confidence.to_s,
-      "PATH" => "#{tmpdir}:#{ENV.fetch("PATH")}"
+      "PATH" => "#{tmpdir}:#{ENV.fetch("PATH")}",
+      "HOME" => tmpdir.to_s,
+      "XDG_CONFIG_HOME" => tmpdir.to_s,
+      "GEM_HOST_API_KEY" => nil
     }
     env["GEM_HOST_API_KEY"] = "test-rubygems-key" if auth
 

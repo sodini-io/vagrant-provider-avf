@@ -115,7 +115,10 @@ RSpec.describe "scripts/publish-supported-linux" do
       "AVF_PUBLISH_BOX_COMMAND" => fake_publish_box.to_s,
       "AVF_RELEASE_CONFIDENCE_COMMAND" => fake_release_confidence.to_s,
       "AVF_SYNC_CLOUD_BOX_METADATA_COMMAND" => fake_sync_cloud_box_metadata.to_s,
-      "PATH" => "#{tmpdir}:#{ENV.fetch("PATH")}"
+      "PATH" => "#{tmpdir}:#{ENV.fetch("PATH")}",
+      "VAGRANT_CLOUD_TOKEN" => nil,
+      "HCP_CLIENT_ID" => nil,
+      "HCP_CLIENT_SECRET" => nil
     }
 
     if auth

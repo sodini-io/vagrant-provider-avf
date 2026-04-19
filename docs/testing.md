@@ -13,6 +13,18 @@ Use the smallest one that answers your question first.
 The support matrix is in [docs/guest-support.md](/Users/jim/Code/vagrant-provider-avf/docs/guest-support.md).
 The publish guide is in [docs/releasing.md](/Users/jim/Code/vagrant-provider-avf/docs/releasing.md).
 
+```mermaid
+flowchart TD
+  A["Need confidence?"] --> B{"What changed?"}
+  B --> C["Unit or doc change"]
+  B --> D["Provider boundary behavior"]
+  B --> E["Real guest or box change"]
+  C --> F["bundle exec rspec"]
+  D --> G["Fast acceptance specs"]
+  E --> H["Guest-specific acceptance"]
+  H --> I["ci-supported-linux or release-confidence"]
+```
+
 ## Prerequisites
 
 ### Fast RSpec suite

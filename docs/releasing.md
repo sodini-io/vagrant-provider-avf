@@ -8,6 +8,16 @@ This repo ships two separate release artifacts:
 Use this guide only after the fast suite and the relevant guest-specific acceptance workflow are green.
 The current support matrix is in [docs/guest-support.md](/Users/jim/Code/vagrant-provider-avf/docs/guest-support.md).
 
+```mermaid
+flowchart TD
+  A["Run release-confidence"] --> B["Publish Ruby gem"]
+  B --> C["Publish Ubuntu box (unreleased)"]
+  C --> D["Verify clean install path"]
+  D --> E["Release Ubuntu"]
+  E --> F["Repeat for AlmaLinux"]
+  F --> G["Repeat for Rocky"]
+```
+
 ## Prerequisites
 
 - `vagrant` installed

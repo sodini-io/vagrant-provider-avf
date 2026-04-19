@@ -74,7 +74,10 @@ RSpec.describe "scripts/sync-cloud-box-metadata" do
 
   def run_script(*args, auth: true)
     env = {
-      "PATH" => "#{tmpdir}:#{ENV.fetch("PATH")}"
+      "PATH" => "#{tmpdir}:#{ENV.fetch("PATH")}",
+      "VAGRANT_CLOUD_TOKEN" => nil,
+      "HCP_CLIENT_ID" => nil,
+      "HCP_CLIENT_SECRET" => nil
     }
 
     if auth
