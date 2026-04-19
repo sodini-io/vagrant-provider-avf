@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+release="${ROCKY_RELEASE:-9.7-20251123.2}"
+major="${ROCKY_MAJOR:-9}"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+output_dir="${repo_root}/build/images/rocky-9-arm64"
+work_dir="${output_dir}/work"
+image_name="Rocky-${major}-GenericCloud-Base-${release}.aarch64.qcow2"
+base_url="https://dl.rockylinux.org/pub/rocky/${major}/images/aarch64"
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required to download the Rocky Linux image" >&2
+  exit 1
+fi
+
+if ! command -v qemu-img >/dev/null 2>&1; then
+  echo "qemu-img is required to convert the Rocky Linux cloud image to raw" >&2
+  exit 1
+fi
+
+if ! command -v shasum >/dev/null 2>&1; then
+  echo "shasum is required to verify the Rocky Linux image" >&2
+  exit 1
+fi
+
+rm -rf "${work_dir}"
+mkdir -p "${work_dir}" "${output_dir}"
+
+curl -fsSL --output "${work_dir}/${image_name}" "${base_url}/${image_name}"
+curl -fsSL --output "${work_dir}/CHECKSUM" "${base_url}/CHECKSUM"
+expected_checksum="$(awk -v image_name="${image_name}" '$2 == "(" image_name ")" { print $4; exit }' "${work_dir}/CHECKSUM")"
+actual_checksum="$(shasum -a 256 "${work_dir}/${image_name}" | awk '{print $1}')"
+
+if [[ -z "${expected_checksum}" ]]; then
+  echo "failed to find checksum for ${image_name}" >&2
+  exit 1
+fi
+
+if [[ "${actual_checksum}" != "${expected_checksum}" ]]; then
+  echo "checksum mismatch for ${image_name}" >&2
+  exit 1
+fi
+
+qemu-img convert -f qcow2 -O raw "${work_dir}/${image_name}" "${output_dir}/disk.img"
+printf '%s\n' "${release}" > "${output_dir}/release.txt"

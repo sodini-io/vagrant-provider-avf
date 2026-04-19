@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="/work"
+release="${UBUNTU_RELEASE:-24.04.4}"
+series="${UBUNTU_SERIES:-noble}"
+base_url="${UBUNTU_BASE_URL:-https://cdimage.ubuntu.com/ubuntu-base/releases/${series}/release}"
+artifact_dir="${BUILD_ROOT:-${repo_root}/build/images/ubuntu-24.04-arm64}"
+work_dir="${WORK_DIR:-/tmp/vagrant-provider-avf-ubuntu-build}"
+rootfs_dir="${work_dir}/rootfs"
+base_disk_size_gb="${BASE_DISK_SIZE_GB:-4}"
+tarball="ubuntu-base-${release}-base-arm64.tar.gz"
+kernel_output="${artifact_dir}/vmlinuz"
+initrd_output="${artifact_dir}/initrd.img"
+disk_output="${artifact_dir}/disk.img"
+release_output="${artifact_dir}/release.txt"
+configure_guest="${repo_root}/images/ubuntu/configure-guest"
+files_dir="${repo_root}/images/ubuntu/files"
+
+cleanup_mounts() {
+  for path in dev/pts dev proc sys; do
+    if mountpoint -q "${rootfs_dir}/${path}" 2>/dev/null; then
+      umount "${rootfs_dir}/${path}"
+    fi
+  done
+}
+
+trap cleanup_mounts EXIT
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  e2fsprogs \
+  file \
+  iproute2 \
+  passwd \
+  systemd \
+  util-linux
+
+cleanup_mounts || true
+rm -rf "${work_dir}"
+mkdir -p "${work_dir}" "${artifact_dir}" "${rootfs_dir}"
+
+curl -fsSL --output "${work_dir}/${tarball}" "${base_url}/${tarball}"
+curl -fsSL --output "${work_dir}/SHA256SUMS" "${base_url}/SHA256SUMS"
+(cd "${work_dir}" && grep "\\*${tarball}\$" SHA256SUMS | sha256sum -c -)
+
+tar -xzf "${work_dir}/${tarball}" -C "${rootfs_dir}"
+cp /etc/resolv.conf "${rootfs_dir}/etc/resolv.conf"
+rm -f "${rootfs_dir}/etc/apt/sources.list.d/ubuntu.sources"
+touch "${rootfs_dir}/etc/modules"
+
+cat > "${rootfs_dir}/etc/apt/sources.list" <<EOF
+deb http://ports.ubuntu.com/ubuntu-ports ${series} main universe
+deb http://ports.ubuntu.com/ubuntu-ports ${series}-updates main universe
+deb http://ports.ubuntu.com/ubuntu-ports ${series}-security main universe
+EOF
+
+install -D -m 0644 "${files_dir}/01-avf.yaml" "${rootfs_dir}/etc/netplan/01-avf.yaml"
+install -D -m 0755 "${files_dir}/avf-report-ssh-info" "${rootfs_dir}/usr/local/libexec/avf-report-ssh-info"
+install -D -m 0644 "${files_dir}/avf-ssh-info.service" "${rootfs_dir}/etc/systemd/system/avf-ssh-info.service"
+install -D -m 0644 "${files_dir}/avf_insecure_key.pub" "${rootfs_dir}/tmp/avf_insecure_key.pub"
+install -D -m 0755 "${configure_guest}" "${rootfs_dir}/tmp/configure-guest"
+
+mkdir -p "${rootfs_dir}/dev/pts" "${rootfs_dir}/proc" "${rootfs_dir}/sys"
+mount --bind /dev "${rootfs_dir}/dev"
+mount --bind /dev/pts "${rootfs_dir}/dev/pts"
+mount -t proc proc "${rootfs_dir}/proc"
+mount --bind /sys "${rootfs_dir}/sys"
+
+chroot "${rootfs_dir}" /usr/bin/env DEBIAN_FRONTEND=noninteractive /tmp/configure-guest
+
+cleanup_mounts
+
+kernel_source="$(find "${rootfs_dir}/boot" -maxdepth 1 -name 'vmlinuz-*' | sort | tail -n 1)"
+initrd_source="$(find "${rootfs_dir}/boot" -maxdepth 1 -name 'initrd.img-*' | sort | tail -n 1)"
+
+if [[ -z "${kernel_source}" || -z "${initrd_source}" ]]; then
+  echo "failed to find kernel or initrd in ${rootfs_dir}/boot" >&2
+  exit 1
+fi
+
+truncate -s "${base_disk_size_gb}G" "${disk_output}"
+mkfs.ext4 -F -L avf-root -d "${rootfs_dir}" "${disk_output}" >/dev/null
+if file "${kernel_source}" | grep -q "gzip compressed data"; then
+  gzip -dc "${kernel_source}" > "${kernel_output}"
+else
+  cp "${kernel_source}" "${kernel_output}"
+fi
+cp "${initrd_source}" "${initrd_output}"
+printf '%s\n' "${release}" > "${release_output}"

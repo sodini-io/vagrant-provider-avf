@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+boxes_dir="${repo_root}/build/boxes"
+
+verify_artifact() {
+  local path="$1"
+  local checksum_path="${path}.sha256"
+
+  [[ -f "${path}" ]] || {
+    echo "missing box artifact: ${path}" >&2
+    exit 1
+  }
+
+  [[ -f "${checksum_path}" ]] || {
+    echo "missing checksum artifact: ${checksum_path}" >&2
+    exit 1
+  }
+}
+
+cd "${repo_root}"
+
+bundle exec rspec
+
+scripts/build-box
+scripts/build-almalinux-box
+scripts/build-rocky-box
+
+verify_artifact "${boxes_dir}/avf-ubuntu-24.04-arm64-0.1.0.box"
+verify_artifact "${boxes_dir}/avf-almalinux-9-arm64-0.1.0.box"
+verify_artifact "${boxes_dir}/avf-rocky-9-arm64-0.1.0.box"
+
+scripts/ci-supported-linux

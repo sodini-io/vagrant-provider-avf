@@ -1,0 +1,38 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "pathname"
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "vagrant_provider_avf/box_package"
+
+REPO_ROOT = Pathname.new(File.expand_path("..", __dir__))
+ARTIFACT_DIR = REPO_ROOT.join("build/images/ubuntu-24.04-arm64")
+OUTPUT_DIR = REPO_ROOT.join("build/boxes")
+PRIVATE_KEY_PATH = REPO_ROOT.join("images/ubuntu/files/avf_insecure_key")
+
+release_file = ARTIFACT_DIR.join("release.txt")
+release = ENV["UBUNTU_RELEASE"] || (release_file.exist? ? release_file.read.strip : "24.04")
+version = ENV.fetch("BOX_VERSION", "0.1.0")
+name = ENV.fetch("BOX_NAME", "avf/ubuntu-24.04-arm64")
+kernel_path = ARTIFACT_DIR.join("vmlinuz")
+initrd_path = ARTIFACT_DIR.join("initrd.img")
+kernel_path = nil unless kernel_path.file?
+initrd_path = nil unless initrd_path.file?
+
+abort("vmlinuz and initrd.img must either both exist or both be absent") if kernel_path.nil? ^ initrd_path.nil?
+
+package = VagrantPlugins::AVF::BoxPackage.new(
+  name: name,
+  version: version,
+  release: release,
+  guest: :linux,
+  kernel_path: kernel_path,
+  initrd_path: initrd_path,
+  disk_image_path: ARTIFACT_DIR.join("disk.img"),
+  private_key_path: PRIVATE_KEY_PATH
+).validate!
+
+output_path = package.write_archive(output_dir: OUTPUT_DIR)
+package.write_checksum(output_path)
+puts output_path

@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+input_path="${1:-}"
+
+if [[ -z "${input_path}" ]]; then
+  echo "usage: scripts/inspect-machine <machine-dir-or-acceptance-root>" >&2
+  exit 1
+fi
+
+machine_dir=""
+
+if [[ -d "${input_path}/.vagrant/machines/default/avf" ]]; then
+  machine_dir="$(cd "${input_path}/.vagrant/machines/default/avf" && pwd)"
+elif [[ -d "${input_path}/work/.vagrant/machines/default/avf" ]]; then
+  machine_dir="$(cd "${input_path}/work/.vagrant/machines/default/avf" && pwd)"
+elif [[ -d "${input_path}" ]]; then
+  machine_dir="$(cd "${input_path}" && pwd)"
+fi
+
+if [[ -z "${machine_dir}" || ! -d "${machine_dir}" ]]; then
+  echo "machine directory does not exist: ${input_path}" >&2
+  exit 1
+fi
+
+print_header() {
+  echo
+  echo "== $1 =="
+}
+
+print_json_file() {
+  local path="$1"
+
+  if [[ ! -f "${path}" ]]; then
+    echo "(missing)"
+    return
+  fi
+
+  ruby -rjson -e 'puts JSON.pretty_generate(JSON.parse(File.read(ARGV[0])))' "${path}" 2>/dev/null || cat "${path}"
+}
+
+print_file_preview() {
+  local path="$1"
+  local max_lines="${2:-40}"
+
+  if [[ ! -f "${path}" ]]; then
+    echo "(missing)"
+    return
+  fi
+
+  if [[ ! -s "${path}" ]]; then
+    echo "(empty)"
+    return
+  fi
+
+  sed -n "1,${max_lines}p" "${path}"
+}
+
+print_header "Machine"
+echo "machine_dir: ${machine_dir}"
+
+print_header "Files"
+for path in \
+  "${machine_dir}/id" \
+  "${machine_dir}/machine_metadata.json" \
+  "${machine_dir}/avf-start-request.json" \
+  "${machine_dir}/avf-started.json" \
+  "${machine_dir}/avf-error.txt" \
+  "${machine_dir}/console.log" \
+  "${machine_dir}/avf-helper.log" \
+  "${machine_dir}/disk.img"
+do
+  if [[ -e "${path}" ]]; then
+    ls -lh "${path}"
+  fi
+done
+
+print_header "Machine Metadata"
+print_json_file "${machine_dir}/machine_metadata.json"
+
+print_header "Start Request"
+print_json_file "${machine_dir}/avf-start-request.json"
+
+print_header "Started Payload"
+print_json_file "${machine_dir}/avf-started.json"
+
+print_header "AVF Error"
+if [[ -f "${machine_dir}/avf-error.txt" ]]; then
+  cat "${machine_dir}/avf-error.txt"
+else
+  echo "(missing)"
+fi
+
+print_header "AVF Helper Log"
+print_file_preview "${machine_dir}/avf-helper.log" 80
+
+print_header "Console Log"
+print_file_preview "${machine_dir}/console.log" 80
+
+if [[ -f "/private/var/db/dhcpd_leases" ]]; then
+  print_header "Host DHCP Leases"
+  awk '
+    BEGIN {
+      in_block = 0
+      block = ""
+      matched = 0
+    }
+    /^{$/ {
+      in_block = 1
+      block = "{\n"
+      matched = 0
+      next
+    }
+    in_block {
+      block = block $0 "\n"
+      if ($0 ~ /name=avf-/ || $0 ~ /ip_address=192\.168\.64\./) {
+        matched = 1
+      }
+      if ($0 ~ /^}$/) {
+        if (matched) {
+          printf "%s\n", block
+        }
+        in_block = 0
+        block = ""
+        matched = 0
+      }
+    }
+  ' /private/var/db/dhcpd_leases
+fi

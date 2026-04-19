@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+attempt=0
+
+while [ "${attempt}" -lt 60 ]; do
+  host="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '/src/ { for (i = 1; i <= NF; i += 1) if ($i == "src") { print $(i + 1); exit } }')"
+
+  if [ -n "${host}" ]; then
+    printf '__AVF_SSH_INFO__ {"host":"%s","port":22,"username":"vagrant"}\n' "${host}" > /dev/hvc0
+    exit 0
+  fi
+
+  attempt=$((attempt + 1))
+  sleep 1
+done

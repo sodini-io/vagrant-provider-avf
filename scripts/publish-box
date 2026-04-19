@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: scripts/publish-box ORGANIZATION/BOX-NAME VERSION BOX-FILE [--release]
+
+Publishes one avf box artifact to Vagrant Cloud using:
+  vagrant cloud publish ORGANIZATION/BOX-NAME VERSION avf BOX-FILE
+
+Examples:
+  scripts/publish-box myorg/ubuntu-24.04-arm64 0.1.0 build/boxes/avf-ubuntu-24.04-arm64-0.1.0.box
+  scripts/publish-box myorg/ubuntu-24.04-arm64 0.1.0 build/boxes/avf-ubuntu-24.04-arm64-0.1.0.box --release
+EOF
+}
+
+[[ $# -ge 3 ]] || {
+  usage
+  exit 1
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+
+box_name="$1"
+version="$2"
+box_file="$3"
+shift 3
+
+release_flag=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --release)
+      release_flag=1
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+ruby -I"${repo_root}/lib" -r vagrant_provider_avf/release_target -e '
+  target = VagrantPlugins::AVF::ReleaseTarget.new(ARGV[0])
+  begin
+    target.validate_publishable!
+  rescue ArgumentError => error
+    abort(error.message)
+  end
+' "${box_name}"
+
+[[ -f "${box_file}" ]] || {
+  printf 'box file does not exist: %s\n' "${box_file}" >&2
+  exit 1
+}
+
+command=(vagrant cloud publish "${box_name}" "${version}" avf "${box_file}" --force)
+[[ "${release_flag}" -eq 1 ]] && command+=(--release)
+
+exec "${command[@]}"

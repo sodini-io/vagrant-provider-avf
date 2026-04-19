@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+apt-get install -y --no-install-recommends \
+  ca-certificates \
+  initramfs-tools \
+  iproute2 \
+  isc-dhcp-client \
+  linux-image-virtual \
+  netplan.io \
+  openssh-server \
+  sudo \
+  systemd-sysv
+
+echo "avf-ubuntu" > /etc/hostname
+
+cat > /etc/hosts <<'EOF'
+127.0.0.1 localhost
+127.0.1.1 avf-ubuntu
+EOF
+
+if ! id -u vagrant >/dev/null 2>&1; then
+  useradd -m -s /bin/bash -U -G sudo vagrant
+fi
+
+install -d -m 0700 -o vagrant -g vagrant /home/vagrant/.ssh
+install -m 0600 -o vagrant -g vagrant /tmp/avf_insecure_key.pub /home/vagrant/.ssh/authorized_keys
+
+cat > /etc/sudoers.d/99-vagrant <<'EOF'
+vagrant ALL=(ALL) NOPASSWD:ALL
+EOF
+chmod 0440 /etc/sudoers.d/99-vagrant
+
+cat > /etc/ssh/sshd_config.d/99-avf.conf <<'EOF'
+PasswordAuthentication no
+PermitRootLogin no
+UseDNS no
+EOF
+
+passwd -l root >/dev/null 2>&1 || true
+
+enable_if_present() {
+  local unit="$1"
+
+  if systemctl list-unit-files "${unit}" --no-legend >/dev/null 2>&1; then
+    systemctl enable "${unit}"
+  fi
+}
+
+enable_if_present ssh.service
+enable_if_present systemd-networkd.service
+enable_if_present systemd-networkd-wait-online.service
+enable_if_present systemd-resolved.service
+enable_if_present serial-getty@hvc0.service
+enable_if_present avf-ssh-info.service
+
+update-initramfs -u -k all
+
+apt-get clean
+rm -f /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+truncate -s 0 /etc/machine-id
+rm -f /var/lib/dbus/machine-id
+find /var/log -type f -exec truncate -s 0 {} + 2>/dev/null || true
+find /tmp /var/tmp -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+rm -rf /var/lib/apt/lists/*

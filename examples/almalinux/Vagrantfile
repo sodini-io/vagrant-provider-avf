@@ -1,0 +1,12 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "avf/almalinux-9-arm64"
+  config.vm.box_check_update = false
+
+  config.vm.provider :avf do |avf|
+    avf.guest = :linux
+    avf.cpus = 2
+    avf.memory_mb = 2048
+    avf.disk_gb = 12
+    avf.headless = true
+  end
+end

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+gem_output_dir="${repo_root}/build/gems"
+default_box_path="${repo_root}/build/boxes/avf-almalinux-9-arm64-0.1.0.box"
+box_path="${1:-${default_box_path}}"
+artifact_dir="${repo_root}/build/images/almalinux-9-arm64"
+version="$(cd "${repo_root}" && ruby -I "${repo_root}/lib" -e 'require "vagrant_provider_avf/version"; print VagrantPlugins::AVF::VERSION')"
+plugin_gem="${gem_output_dir}/vagrant-provider-avf-${version}.gem"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+acceptance_root="${AVF_ACCEPTANCE_ROOT:-}"
+
+if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
+  echo "real acceptance requires macOS on Apple Silicon" >&2
+  exit 1
+fi
+
+if ! command -v vagrant >/dev/null 2>&1; then
+  echo "vagrant is required for real acceptance" >&2
+  exit 1
+fi
+
+if ! command -v xcrun >/dev/null 2>&1; then
+  echo "xcrun is required so the provider can build its local AVF helper" >&2
+  exit 1
+fi
+
+have_almalinux_artifacts() {
+  [[ -f "${artifact_dir}/disk.img" ]] &&
+    [[ -f "${artifact_dir}/release.txt" ]]
+}
+
+ensure_almalinux_box() {
+  if [[ -f "${box_path}" ]]; then
+    return
+  fi
+
+  if [[ "${box_path}" != "${default_box_path}" ]]; then
+    echo "almalinux box file does not exist: ${box_path}" >&2
+    exit 1
+  fi
+
+  if ! have_almalinux_artifacts; then
+    "${repo_root}/images/almalinux/build-image"
+  fi
+
+  ruby "${repo_root}/scripts/build-almalinux-box"
+}
+
+mkdir -p "${gem_output_dir}"
+(cd "${repo_root}" && gem build vagrant-provider-avf.gemspec --output "${plugin_gem}" >/dev/null)
+ensure_almalinux_box
+
+if [[ -n "${acceptance_root}" ]]; then
+  mkdir -p "${acceptance_root}"
+  acceptance_root="$(cd "${acceptance_root}" && pwd)"
+  rm -rf "${acceptance_root}"
+  mkdir -p "${acceptance_root}"
+else
+  acceptance_root="$(mktemp -d)"
+fi
+
+vagrant_home="${acceptance_root}/home"
+smoke_work_dir="${acceptance_root}/work"
+mkdir -p "${vagrant_home}" "${smoke_work_dir}"
+
+cleanup() {
+  status=$?
+
+  if [[ "${status}" -ne 0 && "${keep_failure_artifacts}" == "1" ]]; then
+    echo "preserving acceptance artifacts in ${acceptance_root}" >&2
+    return
+  fi
+
+  rm -rf "${acceptance_root}"
+}
+trap cleanup EXIT
+
+export VAGRANT_HOME="${vagrant_home}"
+export SMOKE_WORK_DIR="${smoke_work_dir}"
+export BOX_NAME="avf/almalinux-9-arm64"
+export DISK_GB="${DISK_GB:-12}"
+
+vagrant plugin install "${plugin_gem}"
+"${repo_root}/scripts/smoke-box" "${box_path}"

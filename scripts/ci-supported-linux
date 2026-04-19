@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+matrix_root="${AVF_ACCEPTANCE_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/avf-linux-matrix.XXXXXX")}"
+
+cleanup() {
+  if [[ "${keep_failure_artifacts}" == "0" && -d "${matrix_root}" ]]; then
+    rm -rf "${matrix_root}"
+  fi
+}
+trap cleanup EXIT
+
+run_guest() {
+  local guest="$1"
+  local script_path="$2"
+
+  AVF_KEEP_FAILURE_ARTIFACTS="${keep_failure_artifacts}" \
+    AVF_ACCEPTANCE_ROOT="${matrix_root}/${guest}" \
+    "${script_path}"
+}
+
+run_guest ubuntu "${repo_root}/scripts/ci-ubuntu-acceptance"
+run_guest almalinux "${repo_root}/scripts/ci-almalinux-acceptance"
+run_guest rocky "${repo_root}/scripts/ci-rocky-acceptance"

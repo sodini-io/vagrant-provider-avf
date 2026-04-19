@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
+  echo "almalinux acceptance requires macOS on Apple Silicon" >&2
+  exit 1
+fi
+
+cd "${repo_root}"
+export AVF_REAL_ACCEPTANCE=1
+export AVF_KEEP_FAILURE_ARTIFACTS="${AVF_KEEP_FAILURE_ARTIFACTS:-1}"
+export AVF_ACCEPTANCE_ROOT="${AVF_ACCEPTANCE_ROOT:-${repo_root}/build/acceptance/almalinux}"
+
+exec bundle exec rspec spec/acceptance/almalinux_box_workflow_spec.rb "$@"

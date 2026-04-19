@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker is required to build the curated Ubuntu ARM image" >&2
+  echo "Install Docker or a compatible local runtime such as Colima." >&2
+  exit 1
+fi
+
+exec docker run \
+  --rm \
+  --platform linux/arm64 \
+  --privileged \
+  --volume "${repo_root}:/work" \
+  --workdir /work \
+  ubuntu:24.04 \
+  bash /work/images/ubuntu/build-image-in-container

@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+usage: scripts/publish-supported-linux VERSION [--family FAMILY] [--org ORGANIZATION] [--release] [--skip-confidence]
+
+Publishes the supported Linux avf boxes in rollout order:
+  ubuntu
+  almalinux
+  rocky
+
+Defaults:
+  ORGANIZATION=sodini-io
+  mode=unreleased
+
+Examples:
+  scripts/publish-supported-linux 0.1.0
+  scripts/publish-supported-linux 0.1.0 --family ubuntu --release
+  scripts/publish-supported-linux 0.1.0 --org myorg --skip-confidence
+EOF
+}
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+
+publish_box_command="${AVF_PUBLISH_BOX_COMMAND:-${repo_root}/scripts/publish-box}"
+release_confidence_command="${AVF_RELEASE_CONFIDENCE_COMMAND:-${repo_root}/scripts/release-confidence}"
+api_wait_attempts="${AVF_PUBLISH_WAIT_ATTEMPTS:-15}"
+api_wait_seconds="${AVF_PUBLISH_WAIT_SECONDS:-2}"
+
+[[ $# -ge 1 ]] || {
+  usage
+  exit 1
+}
+
+version="$1"
+shift
+
+organization="sodini-io"
+release_flag=0
+run_confidence=1
+families=()
+
+require_auth() {
+  if [[ -n "${VAGRANT_CLOUD_TOKEN:-}" ]]; then
+    return
+  fi
+
+  if [[ -n "${HCP_CLIENT_ID:-}" && -n "${HCP_CLIENT_SECRET:-}" ]]; then
+    return
+  fi
+
+  printf 'publish auth is not configured: set VAGRANT_CLOUD_TOKEN or both HCP_CLIENT_ID and HCP_CLIENT_SECRET\n' >&2
+  exit 1
+}
+
+validate_family() {
+  case "$1" in
+    ubuntu | almalinux | rocky) ;;
+    *)
+      printf 'unsupported family: %s\n' "$1" >&2
+      exit 1
+      ;;
+  esac
+}
+
+slug_for() {
+  case "$1" in
+    ubuntu) echo "ubuntu-24.04-arm64" ;;
+    almalinux) echo "almalinux-9-arm64" ;;
+    rocky) echo "rocky-9-arm64" ;;
+  esac
+}
+
+selected_families() {
+  if [[ "${#families[@]}" -eq 0 ]]; then
+    printf 'ubuntu\nalmalinux\nrocky\n'
+    return
+  fi
+
+  printf '%s\n' "${families[@]}"
+}
+
+api_url_for() {
+  printf 'https://vagrantcloud.com/api/v2/vagrant/%s\n' "$1"
+}
+
+box_file_for() {
+  local slug
+
+  slug="$(slug_for "$1")"
+  printf '%s/build/boxes/avf-%s-%s.box\n' "${repo_root}" "${slug}" "${version}"
+}
+
+release_visible_in_api() {
+  local box_name="$1"
+
+  curl -fsSL "$(api_url_for "${box_name}")" |
+    ruby -rjson -e '
+      payload = JSON.parse(STDIN.read)
+      release = payload.fetch("versions", []).find { |entry| entry["version"] == ARGV[0] }
+      providers = release ? release.fetch("providers", []) : []
+      exit(providers.any? { |provider| provider["name"] == "avf" } ? 0 : 1)
+    ' "${version}"
+}
+
+wait_for_release_visibility() {
+  local box_name="$1"
+  local attempt
+
+  for ((attempt = 1; attempt <= api_wait_attempts; attempt += 1)); do
+    if release_visible_in_api "${box_name}"; then
+      printf 'released %s %s is visible in the registry api\n' "${box_name}" "${version}"
+      return
+    fi
+
+    sleep "${api_wait_seconds}"
+  done
+
+  printf 'released %s %s is not visible in the registry api yet\n' "${box_name}" "${version}" >&2
+  exit 1
+}
+
+publish_family() {
+  local family="$1"
+  local slug
+  local box_name
+  local box_file
+  local command
+
+  slug="$(slug_for "${family}")"
+  box_name="${organization}/${slug}"
+  box_file="$(box_file_for "${family}")"
+  command=("${publish_box_command}" "${box_name}" "${version}" "${box_file}")
+
+  [[ "${release_flag}" -eq 1 ]] && command+=(--release)
+
+  "${command[@]}"
+
+  if [[ "${release_flag}" -eq 1 ]]; then
+    wait_for_release_visibility "${box_name}"
+    return
+  fi
+
+  printf 'staged %s as an unreleased version\n' "${box_name}"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --family)
+      shift
+      [[ $# -gt 0 ]] || {
+        usage
+        exit 1
+      }
+      validate_family "$1"
+      families+=("$1")
+      ;;
+    --org)
+      shift
+      [[ $# -gt 0 ]] || {
+        usage
+        exit 1
+      }
+      organization="$1"
+      ;;
+    --release)
+      release_flag=1
+      ;;
+    --skip-confidence)
+      run_confidence=0
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+require_auth
+
+if [[ "${run_confidence}" -eq 1 ]]; then
+  "${release_confidence_command}"
+fi
+
+while IFS= read -r family; do
+  publish_family "${family}"
+done < <(selected_families)

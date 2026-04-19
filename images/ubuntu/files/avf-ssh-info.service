@@ -1,0 +1,11 @@
+[Unit]
+Description=Report SSH connection data for the AVF host
+After=network-online.target ssh.service
+Wants=network-online.target ssh.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/avf-report-ssh-info
+
+[Install]
+WantedBy=multi-user.target
