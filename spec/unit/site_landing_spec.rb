@@ -7,11 +7,12 @@ RSpec.describe "GitHub Pages landing site" do
   let(:nojekyll_path) { File.join(repo_root, "docs/.nojekyll") }
 
   it "ships a landing page for the supported public project surface" do
-    expect(index_html).to include("Vagrant, native on Apple Silicon.")
+    expect(index_html).to include("Native Vagrant for Apple Silicon.")
     expect(index_html).to include("sodini-io/ubuntu-24.04-arm64")
     expect(index_html).to include("sodini-io/almalinux-9-arm64")
     expect(index_html).to include("sodini-io/rocky-9-arm64")
     expect(index_html).to include("vagrant plugin install vagrant-provider-avf")
+    expect(index_html).to include("Read/write Linux `virtiofs` mounts")
   end
 
   it "includes the static assets needed for docs-based GitHub Pages publishing" do

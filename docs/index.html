@@ -23,8 +23,8 @@
         <nav class="site-nav">
           <a href="#quickstart">Quickstart</a>
           <a href="#guests">Guests</a>
+          <a href="#story">Why this exists</a>
           <a href="#features">Features</a>
-          <a href="#limits">Limits</a>
           <a href="#links">Links</a>
         </nav>
       </header>
@@ -33,105 +33,190 @@
         <section class="hero">
           <div class="hero-copy">
             <p class="eyebrow">Release 0.1.0</p>
-            <h1>Vagrant, native on Apple Silicon.</h1>
+            <h1>Native Vagrant for Apple Silicon.</h1>
             <p class="lede">
-              A lean Vagrant provider for Apple Silicon Macs built on Apple
+              A lean Vagrant provider built on Apple
               <code>Virtualization.framework</code>, with curated ARM64 Linux
-              boxes and a real headless workflow.
+              boxes and a real headless workflow that already works on hardware
+              you can buy today.
             </p>
+
+            <div class="hero-points">
+              <span>Apple Silicon only</span>
+              <span>Linux only</span>
+              <span>Headless by design</span>
+              <span>Read/write shared folders</span>
+            </div>
+
             <div class="hero-actions">
-              <a class="button primary" href="https://github.com/sodini-io/vagrant-provider-avf">View on GitHub</a>
-              <a class="button secondary" href="https://rubygems.org/gems/vagrant-provider-avf">Install the Gem</a>
-              <a class="button ghost" href="#quickstart">Jump to Quickstart</a>
+              <a class="button primary" href="#quickstart">Start in 3 steps</a>
+              <a class="button secondary" href="https://github.com/sodini-io/vagrant-provider-avf">View on GitHub</a>
+              <a class="button ghost" href="https://rubygems.org/gems/vagrant-provider-avf">RubyGems</a>
             </div>
           </div>
 
-          <aside class="hero-panel">
-            <p class="panel-title">Quick install</p>
-            <pre><code>vagrant plugin install vagrant-provider-avf
-vagrant box add sodini-io/ubuntu-24.04-arm64 --provider avf --box-version 0.1.0
-vagrant up --provider avf</code></pre>
+          <aside class="hero-terminal" aria-label="terminal walkthrough">
+            <div class="terminal-chrome">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="terminal-body">
+              <p class="terminal-label">$ install</p>
+              <pre><code>vagrant plugin install vagrant-provider-avf</code></pre>
+              <p class="terminal-label">$ add box</p>
+              <pre><code>vagrant box add sodini-io/ubuntu-24.04-arm64 --provider avf --box-version 0.1.0</code></pre>
+              <p class="terminal-label">$ boot</p>
+              <pre><code>vagrant up --provider avf
+vagrant ssh -c 'uname -a && whoami'</code></pre>
+              <div class="terminal-proof">
+                <span>vagrant</span>
+                <span>aarch64</span>
+                <span>shared folders: read/write</span>
+              </div>
+            </div>
           </aside>
         </section>
 
-        <section class="signal-grid">
-          <article class="signal-card">
-            <h2>Native runtime</h2>
-            <p>
-              Uses Apple <code>Virtualization.framework</code> through a signed
-              local helper instead of piling a new VM stack on top.
-            </p>
-          </article>
-          <article class="signal-card">
-            <h2>Focused scope</h2>
-            <p>
-              Linux only, headless only, Apple Silicon only. Small enough to
-              understand. Boring enough to trust.
-            </p>
-          </article>
-          <article class="signal-card">
-            <h2>Real workflow</h2>
-            <p>
-              <code>up</code>, <code>halt</code>, <code>destroy</code>,
-              <code>ssh</code>, honest <code>ssh_info</code>, and read/write
-              Linux shared folders.
-            </p>
-          </article>
+        <section class="trust-bar">
+          <div>
+            <span class="trust-label">Runtime</span>
+            <strong>Apple Virtualization.framework</strong>
+          </div>
+          <div>
+            <span class="trust-label">Support bar</span>
+            <strong>Real Apple Silicon acceptance coverage</strong>
+          </div>
+          <div>
+            <span class="trust-label">What works</span>
+            <strong>`up`, `halt`, `destroy`, `ssh`, `virtiofs`</strong>
+          </div>
         </section>
 
         <section id="guests" class="content-section">
           <div class="section-heading">
             <p class="eyebrow">Supported guests</p>
-            <h2>Three curated Linux boxes</h2>
+            <h2>Three curated Linux boxes. No fake matrix.</h2>
           </div>
 
           <div class="guest-grid">
-            <article class="guest-card">
+            <article class="guest-card featured">
+              <div class="guest-topline">Fastest first run</div>
               <h3>Ubuntu 24.04.4</h3>
-              <p>Smallest quickstart path and the easiest first box to try.</p>
+              <p>
+                The smallest quickstart path and the easiest public install
+                story.
+              </p>
               <code>sodini-io/ubuntu-24.04-arm64</code>
             </article>
             <article class="guest-card">
+              <div class="guest-topline">Enterprise Linux</div>
               <h3>AlmaLinux 9</h3>
-              <p>Enterprise Linux workflow with the supported disk floor.</p>
+              <p>
+                EFI disk boot with the provider-generated Linux NoCloud seed
+                path.
+              </p>
               <code>sodini-io/almalinux-9-arm64</code>
             </article>
             <article class="guest-card">
+              <div class="guest-topline">Enterprise Linux</div>
               <h3>Rocky Linux 9</h3>
-              <p>Same focused ARM64 flow, packaged for Rocky Linux users.</p>
+              <p>
+                Same focused ARM64 flow, packaged for Rocky Linux users on Apple
+                Silicon.
+              </p>
               <code>sodini-io/rocky-9-arm64</code>
             </article>
           </div>
         </section>
 
-        <section id="quickstart" class="content-section">
-          <div class="section-heading">
-            <p class="eyebrow">Quickstart</p>
-            <h2>From install to login in three steps</h2>
+        <section id="quickstart" class="content-section split-layout">
+          <div class="section-heading split-heading">
+            <div>
+              <p class="eyebrow">Quickstart</p>
+              <h2>From install to shell in three clean steps.</h2>
+            </div>
+            <p class="section-note">
+              The provider plugin and the box are separate artifacts. Install
+              the gem once, then add the Linux box you want.
+            </p>
           </div>
 
-          <div class="step-grid">
+          <div class="step-list">
             <article class="step-card">
               <span class="step-number">01</span>
-              <h3>Install the provider</h3>
-              <pre><code>vagrant plugin install vagrant-provider-avf</code></pre>
+              <div>
+                <h3>Install the provider</h3>
+                <pre><code>vagrant plugin install vagrant-provider-avf</code></pre>
+              </div>
             </article>
             <article class="step-card">
               <span class="step-number">02</span>
-              <h3>Add a box</h3>
-              <pre><code>vagrant box add sodini-io/ubuntu-24.04-arm64 --provider avf --box-version 0.1.0</code></pre>
+              <div>
+                <h3>Add a box</h3>
+                <pre><code>vagrant box add sodini-io/ubuntu-24.04-arm64 --provider avf --box-version 0.1.0</code></pre>
+              </div>
             </article>
             <article class="step-card">
               <span class="step-number">03</span>
-              <h3>Bring it up</h3>
-              <pre><code>vagrant up --provider avf
+              <div>
+                <h3>Bring it up</h3>
+                <pre><code>vagrant up --provider avf
 vagrant ssh</code></pre>
+              </div>
             </article>
+          </div>
+        </section>
+
+        <section id="story" class="content-section story-section">
+          <div class="section-heading">
+            <p class="eyebrow">Why this exists</p>
+            <h2>Not a VM platform. A sharp tool.</h2>
+          </div>
+
+          <div class="story-grid">
+            <div class="story-copy">
+              <p>
+                The point of this project is not to turn Vagrant into another
+                sprawling virtualization layer. The point is to make Vagrant
+                feel useful again on Apple Silicon with a native runtime, a
+                curated Linux story, and a support surface small enough to
+                understand.
+              </p>
+              <p>
+                That is why the release line is intentionally narrow: Linux
+                only, headless only, Apple Silicon only, with no bridged
+                networking, no GUI path, and no snapshot surface pretending to
+                be done before it is ready.
+              </p>
+            </div>
+
+            <div class="story-proof">
+              <div class="proof-card">
+                <span>Native runtime</span>
+                <strong>Signed local helper on Apple `Virtualization.framework`</strong>
+              </div>
+              <div class="proof-card">
+                <span>SSH</span>
+                <strong>Localhost forwarding with honest `ssh_info`</strong>
+              </div>
+              <div class="proof-card">
+                <span>Shared folders</span>
+                <strong>Read/write Linux `virtiofs` mounts</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading">
+            <p class="eyebrow">Examples</p>
+            <h2>Simple first. Tuned second.</h2>
           </div>
 
           <div class="example-grid">
             <article class="example-card">
-              <h3>Minimal Ubuntu</h3>
+              <div class="example-label">Minimal Ubuntu</div>
               <pre><code>Vagrant.configure("2") do |config|
   config.vm.box = "sodini-io/ubuntu-24.04-arm64"
   config.vm.box_check_update = false
@@ -146,7 +231,7 @@ end</code></pre>
             </article>
 
             <article class="example-card">
-              <h3>Shared folders and tuning</h3>
+              <div class="example-label">Shared folders and tuning</div>
               <pre><code>Vagrant.configure("2") do |config|
   config.vm.box = "sodini-io/ubuntu-24.04-arm64"
   config.vm.box_check_update = false
@@ -169,67 +254,57 @@ end</code></pre>
         <section id="features" class="content-section">
           <div class="section-heading">
             <p class="eyebrow">What works today</p>
-            <h2>A small, professional support surface</h2>
+            <h2>Support surface with real edges.</h2>
           </div>
 
-          <div class="feature-list">
-            <article>
-              <h3>Lifecycle</h3>
-              <p><code>up</code>, <code>halt</code>, <code>destroy</code>, and stable provider state resolution.</p>
+          <div class="matrix-grid">
+            <article class="matrix-card positive">
+              <h3>Included</h3>
+              <ul>
+                <li>`up`, `halt`, `destroy`</li>
+                <li>`ssh_info` and `vagrant ssh`</li>
+                <li>localhost SSH forwarding</li>
+                <li>stable forwarded port reuse</li>
+                <li>Linux shared folders through `virtiofs`</li>
+                <li>configurable `cpus`, `memory_mb`, `disk_gb`, `headless`</li>
+              </ul>
             </article>
-            <article>
-              <h3>SSH</h3>
-              <p>Localhost forwarding, honest <code>ssh_info</code>, and real <code>vagrant ssh</code> support.</p>
-            </article>
-            <article>
-              <h3>Shared folders</h3>
-              <p>Read/write Linux shared directories through AVF <code>virtiofs</code>.</p>
-            </article>
-            <article>
-              <h3>Release discipline</h3>
-              <p>Curated images, real Apple Silicon acceptance coverage, and focused docs.</p>
+            <article class="matrix-card muted">
+              <h3>Deliberately out</h3>
+              <ul>
+                <li>bridged networking</li>
+                <li>snapshots</li>
+                <li>GUI paths</li>
+                <li>BSD guest support</li>
+                <li>x86 emulation</li>
+                <li>feature sprawl for the sake of symmetry</li>
+              </ul>
             </article>
           </div>
-        </section>
-
-        <section id="limits" class="content-section limits">
-          <div class="section-heading">
-            <p class="eyebrow">Deliberate limits</p>
-            <h2>What this is not trying to be</h2>
-          </div>
-
-          <ul class="limit-list">
-            <li>Apple Silicon macOS only</li>
-            <li>Linux only</li>
-            <li>Headless only</li>
-            <li>No bridged networking</li>
-            <li>No snapshots</li>
-            <li>No GUI path</li>
-          </ul>
         </section>
 
         <section id="links" class="content-section">
           <div class="section-heading">
             <p class="eyebrow">Project links</p>
-            <h2>Everything you need to kick the tires</h2>
+            <h2>Everything you need to kick the tires.</h2>
           </div>
 
           <div class="link-grid">
             <a class="link-card" href="https://github.com/sodini-io/vagrant-provider-avf">
               <span>GitHub</span>
-              <strong>Source, issues, releases</strong>
+              <strong>Source, issues, and releases</strong>
             </a>
             <a class="link-card" href="https://rubygems.org/gems/vagrant-provider-avf">
               <span>RubyGems</span>
-              <strong>`vagrant-provider-avf`</strong>
+              <strong>Install the provider gem</strong>
             </a>
             <a class="link-card" href="https://github.com/sodini-io/vagrant-provider-avf/blob/main/README.md">
               <span>Quickstart</span>
-              <strong>Read the README</strong>
+              <strong>Read the repo guide</strong>
             </a>
             <a class="link-card" href="https://github.com/sodini-io/vagrant-provider-avf/tree/main/docs">
               <span>Deep docs</span>
-              <strong>Testing, releases, scope</strong>
+              <strong>Testing, releases, and scope</strong>
             </a>
           </div>
         </section>
