@@ -23,6 +23,7 @@ EOF
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
 
 publish_box_command="${AVF_PUBLISH_BOX_COMMAND:-${repo_root}/scripts/publish-box}"
 release_confidence_command="${AVF_RELEASE_CONFIDENCE_COMMAND:-${repo_root}/scripts/release-confidence}"
@@ -57,26 +58,15 @@ require_auth() {
 }
 
 validate_family() {
-  case "$1" in
-    ubuntu | almalinux | rocky) ;;
-    *)
-      printf 'unsupported family: %s\n' "$1" >&2
-      exit 1
-      ;;
-  esac
-}
-
-slug_for() {
-  case "$1" in
-    ubuntu) echo "ubuntu-24.04-arm64" ;;
-    almalinux) echo "almalinux-9-arm64" ;;
-    rocky) echo "rocky-9-arm64" ;;
-  esac
+  if ! linux_assert_supported_family "$1" >/dev/null 2>&1; then
+    printf 'unsupported family: %s\n' "$1" >&2
+    exit 1
+  fi
 }
 
 selected_families() {
   if [[ "${#families[@]}" -eq 0 ]]; then
-    printf 'ubuntu\nalmalinux\nrocky\n'
+    linux_supported_families
     return
   fi
 
@@ -88,10 +78,7 @@ api_url_for() {
 }
 
 box_file_for() {
-  local slug
-
-  slug="$(slug_for "$1")"
-  printf '%s/build/boxes/avf-%s-%s.box\n' "${repo_root}" "${slug}" "${version}"
+  linux_default_box_path "${repo_root}" "$1" "${version}"
 }
 
 release_visible_in_api() {
@@ -130,8 +117,8 @@ publish_family() {
   local box_file
   local command
 
-  slug="$(slug_for "${family}")"
-  box_name="${organization}/${slug}"
+  slug="$(linux_slug_for_family "${family}")"
+  box_name="$(linux_cloud_box_name "${organization}" "${family}")"
   box_file="$(box_file_for "${family}")"
   command=("${publish_box_command}" "${box_name}" "${version}" "${box_file}")
 

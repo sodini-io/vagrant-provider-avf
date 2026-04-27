@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
+box_path="${1:-$(linux_default_box_path "${repo_root}" ubuntu)}"
+box_name="${BOX_NAME:-$(linux_box_name ubuntu)}"
+ssh_wait_attempts="${SSH_WAIT_ATTEMPTS:-60}"
+ssh_wait_seconds="${SSH_WAIT_SECONDS:-2}"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+cpus="${CPUS:-2}"
+memory_mb="${MEMORY_MB:-2048}"
+disk_gb="${DISK_GB:-$(linux_default_disk_gb_for_box "${box_name}")}"
+created_work_dir=0
+work_dir="${VERIFY_VAGRANT_COMMANDS_WORK_DIR:-${SMOKE_WORK_DIR:-}}"
+machine_destroyed=0
+skip_box_add="${VERIFY_VAGRANT_COMMANDS_SKIP_BOX_ADD:-0}"
+
+run_vagrant() {
+  (cd "${work_dir}" && vagrant "$@")
+}
+
+machine_state() {
+  run_vagrant status --machine-readable | awk -F, '/,state,/ { print $4; exit }'
+}
+
+verify_state() {
+  local expected_state="$1"
+  local message="$2"
+  local observed_state
+
+  observed_state="$(machine_state)"
+  if [[ "${observed_state}" != "${expected_state}" ]]; then
+    echo "expected vagrant status ${expected_state} but got ${observed_state:-<empty>}" >&2
+    exit 1
+  fi
+
+  echo "verified ${message}"
+}
+
+verify_command_failure() {
+  local message="$1"
+  shift
+
+  if run_vagrant "$@" >/dev/null 2>&1; then
+    echo "expected vagrant $* to fail" >&2
+    exit 1
+  fi
+
+  echo "verified ${message}"
+}
+
+wait_for_ssh() {
+  local ssh_ready=false
+
+  for ((attempt = 1; attempt <= ssh_wait_attempts; attempt += 1)); do
+    if run_vagrant ssh -c "true" >/dev/null 2>&1; then
+      ssh_ready=true
+      break
+    fi
+
+    sleep "${ssh_wait_seconds}"
+  done
+
+  if [[ "${ssh_ready}" != "true" ]]; then
+    echo "vagrant ssh did not become ready after ${ssh_wait_attempts} attempts" >&2
+    exit 1
+  fi
+
+  echo "verified vagrant ssh reaches the guest"
+}
+
+verify_ssh_config() {
+  local expected_host="$1"
+  local expected_user="$2"
+  local ssh_config
+
+  ssh_config="$(run_vagrant ssh-config)"
+
+  ssh_host="$(awk '$1 == "HostName" { print $2; exit }' <<<"${ssh_config}")"
+  ssh_port="$(awk '$1 == "Port" { print $2; exit }' <<<"${ssh_config}")"
+  ssh_user="$(awk '$1 == "User" { print $2; exit }' <<<"${ssh_config}")"
+
+  if [[ "${ssh_host}" != "${expected_host}" ]]; then
+    echo "expected HostName ${expected_host} but got ${ssh_host:-<empty>}" >&2
+    exit 1
+  fi
+
+  if [[ -z "${ssh_port}" ]]; then
+    echo "vagrant ssh-config did not report a forwarded SSH port" >&2
+    exit 1
+  fi
+
+  if [[ "${ssh_user}" != "${expected_user}" ]]; then
+    echo "expected SSH user ${expected_user} but got ${ssh_user:-<empty>}" >&2
+    exit 1
+  fi
+
+  echo "verified vagrant ssh-config reports localhost forwarding for ${expected_user}"
+}
+
+verify_file_contains() {
+  local path="$1"
+  local pattern="$2"
+
+  if ! grep -q "^${pattern}$" "${path}"; then
+    echo "expected ${path} to contain ${pattern}" >&2
+    exit 1
+  fi
+}
+
+if ! command -v vagrant >/dev/null 2>&1; then
+  echo "vagrant is required for command verification" >&2
+  exit 1
+fi
+
+if [[ "${skip_box_add}" != "1" && ! -f "${box_path}" ]]; then
+  echo "box file does not exist: ${box_path}" >&2
+  exit 1
+fi
+
+if [[ -n "${work_dir}" ]]; then
+  mkdir -p "${work_dir}"
+else
+  work_dir="$(mktemp -d)"
+  created_work_dir=1
+fi
+
+cleanup() {
+  status=$?
+
+  if [[ "${status}" -ne 0 && "${keep_failure_artifacts}" == "1" ]]; then
+    echo "preserving verification artifacts in ${work_dir}" >&2
+    return
+  fi
+
+  if [[ "${machine_destroyed}" -eq 0 && -f "${work_dir}/Vagrantfile" ]]; then
+    run_vagrant destroy -f >/dev/null 2>&1 || true
+  fi
+
+  if [[ "${created_work_dir}" -eq 1 ]]; then
+    rm -rf "${work_dir}"
+  fi
+}
+trap cleanup EXIT
+
+cat > "${work_dir}/Vagrantfile" <<'EOF'
+Vagrant.configure("2") do |config|
+  config.vm.box = ENV.fetch("BOX_NAME", "avf/ubuntu-24.04-arm64")
+  config.vm.box_check_update = false
+  config.vm.synced_folder "host-share", "/home/vagrant/workdir", create: true
+
+  config.vm.provider :avf do |avf|
+    avf.cpus = Integer(ENV.fetch("CPUS", "2"))
+    avf.memory_mb = Integer(ENV.fetch("MEMORY_MB", "2048"))
+    avf.disk_gb = Integer(ENV.fetch("DISK_GB", "8"))
+  end
+end
+EOF
+
+export BOX_NAME="${box_name}"
+export CPUS="${cpus}"
+export MEMORY_MB="${memory_mb}"
+export DISK_GB="${disk_gb}"
+mkdir -p "${work_dir}/host-share"
+printf 'from-host\n' > "${work_dir}/host-share/host.txt"
+
+if [[ "${skip_box_add}" == "1" ]]; then
+  echo "verified vagrant box add already completed for ${box_name}"
+else
+  vagrant box add --force --name "${box_name}" "${box_path}"
+  echo "verified vagrant box add stages ${box_name} from a local box file"
+fi
+
+run_vagrant validate >/dev/null
+echo "verified vagrant validate accepts the generated Vagrantfile"
+
+verify_state "not_created" "vagrant status before up reports not_created"
+
+run_vagrant up --provider=avf >/dev/null
+verify_state "running" "vagrant up reaches running"
+
+wait_for_ssh
+verify_ssh_config "127.0.0.1" "vagrant"
+first_ssh_port="${ssh_port}"
+
+run_vagrant ssh -c "id -un && uname -m"
+run_vagrant ssh -c "test -s /etc/machine-id && find /etc/ssh -maxdepth 1 -name 'ssh_host_*_key' | grep -q ."
+run_vagrant ssh -c "test -f /vagrant/Vagrantfile && grep -q from-host /home/vagrant/workdir/host.txt && printf 'from-guest\n' > /home/vagrant/workdir/guest.txt"
+verify_file_contains "${work_dir}/host-share/guest.txt" "from-guest"
+echo "verified guest writes through the shared host directory"
+
+run_vagrant halt >/dev/null
+verify_state "stopped" "vagrant halt reaches a stopped state"
+verify_command_failure "vagrant ssh fails after halt" ssh -c "true"
+
+run_vagrant up --provider=avf >/dev/null
+verify_state "running" "vagrant up reaches running after halt"
+
+wait_for_ssh
+verify_ssh_config "127.0.0.1" "vagrant"
+
+if [[ "${ssh_port}" != "${first_ssh_port}" ]]; then
+  echo "expected SSH port ${first_ssh_port} after restart but got ${ssh_port:-<empty>}" >&2
+  exit 1
+fi
+
+echo "verified vagrant up after halt reuses the forwarded SSH port"
+run_vagrant ssh -c "id -un && uname -m"
+run_vagrant ssh -c "grep -q from-host /home/vagrant/workdir/host.txt && printf 'from-guest-restart\n' > /home/vagrant/workdir/guest-restart.txt"
+verify_file_contains "${work_dir}/host-share/guest-restart.txt" "from-guest-restart"
+echo "verified guest writes through the shared host directory after restart"
+
+run_vagrant destroy -f >/dev/null
+machine_destroyed=1
+verify_state "not_created" "vagrant destroy returns the machine to not_created"

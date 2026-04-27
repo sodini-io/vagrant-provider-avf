@@ -6,7 +6,7 @@
     <title>vagrant-provider-avf</title>
     <meta
       name="description"
-      content="A lean Vagrant provider for Apple Silicon Macs using Apple Virtualization.framework, with native ARM64 Linux support for Ubuntu, AlmaLinux, and Rocky Linux."
+      content="A Vagrant provider for Apple Silicon Macs using Apple Virtualization.framework, with ARM64 Linux support for Ubuntu, AlmaLinux, and Rocky Linux."
     >
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,10 +35,9 @@
             <p class="eyebrow">Release 0.1.0</p>
             <h1>Native Vagrant for Apple Silicon.</h1>
             <p class="lede">
-              A lean Vagrant provider built on Apple
-              <code>Virtualization.framework</code>, with curated ARM64 Linux
-              boxes and a real headless workflow that already works on hardware
-              you can buy today.
+              A Vagrant provider built on Apple
+              <code>Virtualization.framework</code>, with ARM64 Linux boxes and
+              a headless workflow that works on real Apple Silicon hardware.
             </p>
 
             <div class="hero-points">
@@ -96,7 +95,7 @@ vagrant ssh -c 'uname -a && whoami'</code></pre>
         <section id="guests" class="content-section">
           <div class="section-heading">
             <p class="eyebrow">Supported guests</p>
-            <h2>Three curated Linux boxes. No fake matrix.</h2>
+            <h2>Three Linux boxes we actually support.</h2>
           </div>
 
           <div class="guest-grid">
@@ -104,8 +103,7 @@ vagrant ssh -c 'uname -a && whoami'</code></pre>
               <div class="guest-topline">Fastest first run</div>
               <h3>Ubuntu 24.04.4</h3>
               <p>
-                The smallest quickstart path and the easiest public install
-                story.
+                The easiest place to start.
               </p>
               <code>sodini-io/ubuntu-24.04-arm64</code>
             </article>
@@ -113,8 +111,7 @@ vagrant ssh -c 'uname -a && whoami'</code></pre>
               <div class="guest-topline">Enterprise Linux</div>
               <h3>AlmaLinux 9</h3>
               <p>
-                EFI disk boot with the provider-generated Linux NoCloud seed
-                path.
+                EFI disk boot with the provider's Linux NoCloud seed disk.
               </p>
               <code>sodini-io/almalinux-9-arm64</code>
             </article>
@@ -122,8 +119,7 @@ vagrant ssh -c 'uname -a && whoami'</code></pre>
               <div class="guest-topline">Enterprise Linux</div>
               <h3>Rocky Linux 9</h3>
               <p>
-                Same focused ARM64 flow, packaged for Rocky Linux users on Apple
-                Silicon.
+                The same basic flow, packaged for Rocky Linux.
               </p>
               <code>sodini-io/rocky-9-arm64</code>
             </article>
@@ -171,23 +167,19 @@ vagrant ssh</code></pre>
         <section id="story" class="content-section story-section">
           <div class="section-heading">
             <p class="eyebrow">Why this exists</p>
-            <h2>Not a VM platform. A sharp tool.</h2>
+            <h2>Small on purpose.</h2>
           </div>
 
           <div class="story-grid">
             <div class="story-copy">
               <p>
-                The point of this project is not to turn Vagrant into another
-                sprawling virtualization layer. The point is to make Vagrant
-                feel useful again on Apple Silicon with a native runtime, a
-                curated Linux story, and a support surface small enough to
-                understand.
+                This project exists to make Vagrant usable on Apple Silicon
+                without turning it into another VM platform. The focus is a
+                small Linux surface that is easy to understand and support.
               </p>
               <p>
-                That is why the release line is intentionally narrow: Linux
-                only, headless only, Apple Silicon only, with no bridged
-                networking, no GUI path, and no snapshot surface pretending to
-                be done before it is ready.
+                That means Linux only, headless only, Apple Silicon only, with
+                no bridged networking, no GUI path, and no snapshot support.
               </p>
             </div>
 
@@ -198,7 +190,7 @@ vagrant ssh</code></pre>
               </div>
               <div class="proof-card">
                 <span>SSH</span>
-                <strong>Localhost forwarding with honest `ssh_info`</strong>
+                <strong>Localhost forwarding with working `ssh_info`</strong>
               </div>
               <div class="proof-card">
                 <span>Shared folders</span>
@@ -254,7 +246,7 @@ end</code></pre>
         <section id="features" class="content-section">
           <div class="section-heading">
             <p class="eyebrow">What works today</p>
-            <h2>Support surface with real edges.</h2>
+            <h2>What works and what does not.</h2>
           </div>
 
           <div class="matrix-grid">
@@ -270,14 +262,14 @@ end</code></pre>
               </ul>
             </article>
             <article class="matrix-card muted">
-              <h3>Deliberately out</h3>
+              <h3>Not included</h3>
               <ul>
                 <li>bridged networking</li>
                 <li>snapshots</li>
                 <li>GUI paths</li>
                 <li>BSD guest support</li>
                 <li>x86 emulation</li>
-                <li>feature sprawl for the sake of symmetry</li>
+                <li>a long feature checklist just to match other providers</li>
               </ul>
             </article>
           </div>
@@ -286,7 +278,7 @@ end</code></pre>
         <section id="links" class="content-section">
           <div class="section-heading">
             <p class="eyebrow">Project links</p>
-            <h2>Everything you need to kick the tires.</h2>
+            <h2>Links</h2>
           </div>
 
           <div class="link-grid">

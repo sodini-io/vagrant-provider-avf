@@ -61,6 +61,7 @@ EOF
 
 install -D -m 0644 "${files_dir}/01-avf.yaml" "${rootfs_dir}/etc/netplan/01-avf.yaml"
 install -D -m 0755 "${files_dir}/avf-report-ssh-info" "${rootfs_dir}/usr/local/libexec/avf-report-ssh-info"
+install -D -m 0644 "${files_dir}/avf-ssh-hostkeys.service" "${rootfs_dir}/etc/systemd/system/avf-ssh-hostkeys.service"
 install -D -m 0644 "${files_dir}/avf-ssh-info.service" "${rootfs_dir}/etc/systemd/system/avf-ssh-info.service"
 install -D -m 0644 "${files_dir}/avf_insecure_key.pub" "${rootfs_dir}/tmp/avf_insecure_key.pub"
 install -D -m 0755 "${configure_guest}" "${rootfs_dir}/tmp/configure-guest"

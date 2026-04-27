@@ -76,6 +76,11 @@ RSpec.describe VagrantPlugins::AVF::Provider do
     expect(provider.action(:ssh_run)).to be_a(Vagrant::Action::Builder)
   end
 
+  it "returns nil for unsupported provider actions" do
+    expect(provider.action(:reload)).to be_nil
+    expect(provider.action(:suspend)).to be_nil
+  end
+
   it "returns not_created through the read_state action path before up runs" do
     expect(provider.state.id).to eq(:not_created)
   end

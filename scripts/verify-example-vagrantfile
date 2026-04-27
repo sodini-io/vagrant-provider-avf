@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
+example_path="${1:-}"
+org_slug="${2:-${AVF_BOX_ORG:-sodini-io}}"
+box_version="${3:-${AVF_BOX_VERSION:-0.1.0}}"
+plugin_name="${VERIFY_PUBLISHED_PLUGIN_NAME:-vagrant-provider-avf}"
+plugin_version="${VERIFY_PUBLISHED_PLUGIN_VERSION:-}"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+acceptance_root="${AVF_ACCEPTANCE_ROOT:-}"
+
+example_dir() {
+  if [[ -d "${example_path}" ]]; then
+    printf '%s\n' "${example_path}"
+  else
+    dirname "${example_path}"
+  fi
+}
+
+example_name() {
+  basename "$(example_dir)"
+}
+
+local_box_name() {
+  ruby -e '
+    content = File.read(ARGV.first)
+    match = content.match(/config\.vm\.box\s*=\s*"([^"]+)"/)
+    abort("could not determine config.vm.box from #{ARGV.first}") unless match
+    print match[1]
+  ' "${vagrantfile_path}"
+}
+
+published_box_name() {
+  case "${local_box}" in
+    avf/*)
+      printf '%s/%s\n' "${org_slug}" "${local_box#avf/}"
+      ;;
+    *)
+      echo "example uses unsupported local box name: ${local_box}" >&2
+      exit 1
+      ;;
+  esac
+}
+
+run_vagrant() {
+  (cd "${work_dir}" && vagrant "$@")
+}
+
+machine_state() {
+  run_vagrant status --machine-readable | awk -F, '/,state,/ { print $4; exit }'
+}
+
+verify_state() {
+  local expected_state="$1"
+  local message="$2"
+  local observed_state
+
+  observed_state="$(machine_state)"
+  if [[ "${observed_state}" != "${expected_state}" ]]; then
+    echo "expected vagrant status ${expected_state} but got ${observed_state:-<empty>}" >&2
+    exit 1
+  fi
+
+  echo "verified ${message}"
+}
+
+verify_command_failure() {
+  local message="$1"
+  shift
+
+  if run_vagrant "$@" >/dev/null 2>&1; then
+    echo "expected vagrant $* to fail" >&2
+    exit 1
+  fi
+
+  echo "verified ${message}"
+}
+
+wait_for_ssh() {
+  local ssh_ready=false
+
+  for ((attempt = 1; attempt <= ssh_wait_attempts; attempt += 1)); do
+    if run_vagrant ssh -c "true" >/dev/null 2>&1; then
+      ssh_ready=true
+      break
+    fi
+
+    sleep "${ssh_wait_seconds}"
+  done
+
+  if [[ "${ssh_ready}" != "true" ]]; then
+    echo "vagrant ssh did not become ready after ${ssh_wait_attempts} attempts" >&2
+    exit 1
+  fi
+
+  echo "verified example vagrant ssh reaches the guest"
+}
+
+verify_ssh_config() {
+  local ssh_config
+
+  ssh_config="$(run_vagrant ssh-config)"
+  ssh_host="$(awk '$1 == "HostName" { print $2; exit }' <<<"${ssh_config}")"
+  ssh_port="$(awk '$1 == "Port" { print $2; exit }' <<<"${ssh_config}")"
+  ssh_user="$(awk '$1 == "User" { print $2; exit }' <<<"${ssh_config}")"
+
+  if [[ "${ssh_host}" != "127.0.0.1" ]]; then
+    echo "expected HostName 127.0.0.1 but got ${ssh_host:-<empty>}" >&2
+    exit 1
+  fi
+
+  if [[ -z "${ssh_port}" ]]; then
+    echo "vagrant ssh-config did not report a forwarded SSH port" >&2
+    exit 1
+  fi
+
+  if [[ "${ssh_user}" != "vagrant" ]]; then
+    echo "expected SSH user vagrant but got ${ssh_user:-<empty>}" >&2
+    exit 1
+  fi
+
+  echo "verified example vagrant ssh-config reports localhost forwarding for vagrant"
+}
+
+verify_file_contains() {
+  local path="$1"
+  local pattern="$2"
+
+  if ! grep -q "^${pattern}$" "${path}"; then
+    echo "expected ${path} to contain ${pattern}" >&2
+    exit 1
+  fi
+}
+
+if [[ -z "${example_path}" ]]; then
+  echo "usage: verify-example-vagrantfile EXAMPLE_PATH [ORG_SLUG] [BOX_VERSION]" >&2
+  exit 1
+fi
+
+if ! command -v vagrant >/dev/null 2>&1; then
+  echo "vagrant is required for example verification" >&2
+  exit 1
+fi
+
+if ! command -v xcrun >/dev/null 2>&1; then
+  echo "xcrun is required so the provider can build its local AVF helper" >&2
+  exit 1
+fi
+
+example_dir="$(cd "$(example_dir)" && pwd)"
+vagrantfile_path="${example_dir}/Vagrantfile"
+if [[ ! -f "${vagrantfile_path}" ]]; then
+  echo "example Vagrantfile does not exist: ${vagrantfile_path}" >&2
+  exit 1
+fi
+
+local_box="$(local_box_name)"
+published_box="$(published_box_name)"
+ssh_wait_attempts="${SSH_WAIT_ATTEMPTS:-60}"
+ssh_wait_seconds="${SSH_WAIT_SECONDS:-2}"
+
+if [[ -n "${acceptance_root}" ]]; then
+  mkdir -p "${acceptance_root}"
+  acceptance_root="$(cd "${acceptance_root}" && pwd)"
+  rm -rf "${acceptance_root}"
+  mkdir -p "${acceptance_root}"
+else
+  acceptance_root="$(mktemp -d)"
+fi
+
+vagrant_home="${acceptance_root}/home"
+work_dir="${acceptance_root}/work"
+machine_destroyed=0
+mkdir -p "${vagrant_home}" "${work_dir}"
+
+cleanup() {
+  status=$?
+
+  if [[ "${status}" -ne 0 && "${keep_failure_artifacts}" == "1" ]]; then
+    echo "preserving example verification artifacts in ${acceptance_root}" >&2
+    return
+  fi
+
+  if [[ "${machine_destroyed}" -eq 0 && -f "${work_dir}/Vagrantfile" ]]; then
+    run_vagrant destroy -f >/dev/null 2>&1 || true
+  fi
+
+  rm -rf "${acceptance_root}"
+}
+trap cleanup EXIT
+
+cp -R "${example_dir}/." "${work_dir}"
+
+ruby -e '
+  path = ARGV.fetch(0)
+  from = ARGV.fetch(1)
+  to = ARGV.fetch(2)
+  content = File.read(path)
+  updated = content.gsub(from, to)
+  abort("expected to replace #{from} in #{path}") if updated == content
+  File.write(path, updated)
+' "${work_dir}/Vagrantfile" "${local_box}" "${published_box}"
+
+if [[ "$(example_name)" == "shared-folders" ]]; then
+  mkdir -p "${work_dir}/examples"
+  printf 'from-host\n' > "${work_dir}/examples/host.txt"
+fi
+
+export VAGRANT_HOME="${vagrant_home}"
+
+if [[ -n "${plugin_version}" ]]; then
+  vagrant plugin install "${plugin_name}" --plugin-version "${plugin_version}"
+else
+  vagrant plugin install "${plugin_name}"
+fi
+
+if ! vagrant plugin list | grep -q "^${plugin_name} "; then
+  echo "vagrant plugin install did not make ${plugin_name} available" >&2
+  exit 1
+fi
+
+echo "verified example plugin install provides ${plugin_name}"
+echo "verified example Vagrantfile rewrites ${local_box} to ${published_box}"
+vagrant box add "${published_box}" --provider avf --box-version "${box_version}"
+echo "verified example box add fetches ${published_box} ${box_version}"
+export DISK_GB="${DISK_GB:-$(linux_default_disk_gb_for_box "${local_box}")}"
+echo "verified example flow uses disk_gb ${DISK_GB} for ${published_box}"
+
+run_vagrant validate >/dev/null
+echo "verified example vagrant validate accepts $(example_name)"
+verify_state "not_created" "example vagrant status before up reports not_created"
+
+run_vagrant up --provider=avf >/dev/null
+verify_state "running" "example vagrant up reaches running"
+
+wait_for_ssh
+verify_ssh_config
+first_ssh_port="${ssh_port}"
+
+run_vagrant ssh -c "id -un && uname -m"
+
+if [[ "$(example_name)" == "shared-folders" ]]; then
+  run_vagrant ssh -c "test -f /vagrant/Vagrantfile && grep -q from-host /home/vagrant/examples/host.txt && printf 'from-examples-share\n' > /home/vagrant/examples/from-examples-share.txt && printf 'from-root-share\n' > /vagrant/from-root-share.txt"
+  verify_file_contains "${work_dir}/examples/from-examples-share.txt" "from-examples-share"
+  verify_file_contains "${work_dir}/from-root-share.txt" "from-root-share"
+  echo "verified shared-folders example writes through both guest mounts"
+fi
+
+run_vagrant halt >/dev/null
+verify_state "stopped" "example vagrant halt reaches a stopped state"
+verify_command_failure "example vagrant ssh fails after halt" ssh -c "true"
+
+run_vagrant up --provider=avf >/dev/null
+verify_state "running" "example vagrant up reaches running after halt"
+
+wait_for_ssh
+verify_ssh_config
+
+if [[ "${ssh_port}" != "${first_ssh_port}" ]]; then
+  echo "expected SSH port ${first_ssh_port} after restart but got ${ssh_port:-<empty>}" >&2
+  exit 1
+fi
+
+echo "verified example vagrant up after halt reuses the forwarded SSH port"
+run_vagrant ssh -c "id -un && uname -m"
+
+if [[ "$(example_name)" == "shared-folders" ]]; then
+  run_vagrant ssh -c "printf 'from-examples-share-restart\n' > /home/vagrant/examples/from-examples-share-restart.txt && printf 'from-root-share-restart\n' > /vagrant/from-root-share-restart.txt"
+  verify_file_contains "${work_dir}/examples/from-examples-share-restart.txt" "from-examples-share-restart"
+  verify_file_contains "${work_dir}/from-root-share-restart.txt" "from-root-share-restart"
+  echo "verified shared-folders example writes through both guest mounts after restart"
+fi
+
+run_vagrant destroy -f >/dev/null
+machine_destroyed=1
+verify_state "not_created" "example vagrant destroy returns the machine to not_created"

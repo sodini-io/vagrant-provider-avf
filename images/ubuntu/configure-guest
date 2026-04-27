@@ -51,6 +51,7 @@ enable_if_present() {
 }
 
 enable_if_present ssh.service
+enable_if_present avf-ssh-hostkeys.service
 enable_if_present systemd-networkd.service
 enable_if_present systemd-networkd-wait-online.service
 enable_if_present systemd-resolved.service

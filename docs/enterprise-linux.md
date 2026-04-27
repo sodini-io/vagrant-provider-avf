@@ -25,7 +25,7 @@ The provider already has the pieces needed for a narrow enterprise Linux slice:
 - Linux EFI disk boot
 - provider-generated NoCloud seed disks for disk-boot Linux guests
 - NAT plus localhost SSH forwarding
-- honest `ssh_info`
+- accurate `ssh_info`
 - Linux shared directories through virtiofs
 - a box packager that already supports disk-only Linux boxes
 - a green AlmaLinux 9 real acceptance path through `scripts/ci-almalinux-acceptance`
@@ -33,11 +33,11 @@ The provider already has the pieces needed for a narrow enterprise Linux slice:
 
 ## What Is Still Missing
 
-The current Ubuntu workflow is still curated and does not use this generic disk-boot path at runtime.
+The current Ubuntu workflow still uses its own direct-kernel path and does not use this generic disk-boot path at runtime.
 
 The AlmaLinux and Rocky Linux slices are now in place:
 
-1. package one curated enterprise Linux box around an official Generic Cloud image
+1. package one enterprise Linux box around an official Generic Cloud image
 2. prove `up`, `ssh`, `halt`, `destroy`, and shared directories through a real Apple Silicon acceptance workflow
 3. add it to the release matrix once the acceptance path is green
 

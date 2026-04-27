@@ -4,6 +4,8 @@ This repo has four main verification paths:
 
 - the fast RSpec suite
 - fast provider-boundary acceptance for the supported Linux feature surface
+- explicit command verification for the supported Vagrant surface
+- clean-home published install verification for released Linux boxes
 - a real Ubuntu acceptance workflow
 - a real AlmaLinux acceptance workflow
 - a real Rocky Linux acceptance workflow
@@ -15,7 +17,7 @@ The publish guide is in [docs/releasing.md](/Users/jim/Code/vagrant-provider-avf
 
 ```mermaid
 flowchart TD
-  A["Need confidence?"] --> B{"What changed?"}
+  A["What should I run?"] --> B{"What changed?"}
   B --> C["Unit or doc change"]
   B --> D["Provider boundary behavior"]
   B --> E["Real guest or box change"]
@@ -79,8 +81,9 @@ What success looks like:
 Important gotcha:
 
 - this run skips the hardware-backed acceptance specs unless `AVF_REAL_ACCEPTANCE=1` is set
+- it also skips the post-publish registry-backed acceptance spec unless `AVF_REAL_PUBLISHED_ACCEPTANCE=1` is set
 
-The fast suite is intentionally dominated by unit tests.
+The fast suite is mostly unit tests.
 It also includes provider-boundary acceptance specs for:
 
 - lifecycle behavior
@@ -96,7 +99,24 @@ images/ubuntu/build-image
 scripts/build-box
 ```
 
-Smoke:
+Command verification:
+
+```bash
+scripts/verify-vagrant-commands build/boxes/avf-ubuntu-24.04-arm64-0.1.0.box
+```
+
+That script checks the supported Vagrant commands directly. It verifies:
+
+- `vagrant validate`
+- `vagrant status`
+- `vagrant up`
+- `vagrant ssh`
+- `vagrant ssh-config`
+- `vagrant halt`
+- `vagrant destroy`
+- read/write shared-folder behavior through the guest lifecycle
+
+Backward-compatible alias:
 
 ```bash
 scripts/smoke-box build/boxes/avf-ubuntu-24.04-arm64-0.1.0.box
@@ -110,7 +130,7 @@ scripts/ci-ubuntu-acceptance
 
 Success looks like:
 
-- the smoke or acceptance command exits with status `0`
+- the verifier or acceptance command exits with status `0`
 - guest SSH commands print:
 
 ```text
@@ -122,7 +142,7 @@ Important gotchas:
 
 - `images/ubuntu/build-image` currently depends on Docker
 - the supported Ubuntu path boots directly from the packaged kernel, initrd, and labeled ext4 root disk
-- `scripts/smoke-box` uses the current `VAGRANT_HOME`
+- `scripts/verify-vagrant-commands` uses the current `VAGRANT_HOME`
 - `scripts/run-acceptance-ubuntu` creates an isolated `VAGRANT_HOME`
 
 ## AlmaLinux
@@ -134,10 +154,10 @@ images/almalinux/build-image
 scripts/build-almalinux-box
 ```
 
-Smoke:
+Command verification:
 
 ```bash
-DISK_GB=12 BOX_NAME=avf/almalinux-9-arm64 scripts/smoke-box build/boxes/avf-almalinux-9-arm64-0.1.0.box
+DISK_GB=12 BOX_NAME=avf/almalinux-9-arm64 scripts/verify-vagrant-commands build/boxes/avf-almalinux-9-arm64-0.1.0.box
 ```
 
 Real acceptance:
@@ -161,10 +181,10 @@ images/rocky/build-image
 scripts/build-rocky-box
 ```
 
-Smoke:
+Command verification:
 
 ```bash
-DISK_GB=12 BOX_NAME=avf/rocky-9-arm64 scripts/smoke-box build/boxes/avf-rocky-9-arm64-0.1.0.box
+DISK_GB=12 BOX_NAME=avf/rocky-9-arm64 scripts/verify-vagrant-commands build/boxes/avf-rocky-9-arm64-0.1.0.box
 ```
 
 Real acceptance:
@@ -184,6 +204,49 @@ scripts/ci-supported-linux
 Use this when you want one end-to-end system gate for the currently supported Linux matrix.
 It uses temporary acceptance roots by default and cleans them on success unless `AVF_KEEP_FAILURE_ARTIFACTS=1` is set.
 
+## Published Box Verification
+
+Use this after the plugin gem and Linux boxes are already published.
+
+Verify one clean public install path:
+
+```bash
+scripts/verify-published-box sodini-io/ubuntu-24.04-arm64 0.1.0
+```
+
+That path creates a clean `VAGRANT_HOME`, installs `vagrant-provider-avf` from RubyGems, adds the published `avf` box from the registry, and then runs the same command-level lifecycle verifier used for local box testing.
+
+Verify the full published Linux matrix:
+
+```bash
+scripts/ci-published-supported-linux sodini-io 0.1.0
+```
+
+Or run the dedicated published acceptance spec wrapper:
+
+```bash
+scripts/post-release-confidence sodini-io 0.1.0
+```
+
+What success looks like:
+
+- the script exits with status `0`
+- each guest prints:
+
+```text
+vagrant
+aarch64
+```
+
+Important gotchas:
+
+- Ubuntu uses the normal `8` GB floor in the published verifier
+- AlmaLinux and Rocky use `12` GB automatically in the published verifier
+- this path downloads the plugin gem and the boxes into isolated temporary `VAGRANT_HOME` directories, so it will use noticeable disk while it runs
+- `AVF_KEEP_FAILURE_ARTIFACTS=1` is useful here because the preserved `home/` and `work/` directories capture the exact clean-user environment that failed
+- `scripts/post-release-confidence` enables `AVF_REAL_PUBLISHED_ACCEPTANCE=1` for the published acceptance spec automatically
+- `scripts/ci-published-examples` verifies that the published plugin and boxes still work with the example Vagrantfiles under `examples/`
+
 ## Release-Confidence Gate
 
 Run:
@@ -200,6 +263,26 @@ What it does:
 - runs the full supported Linux system matrix
 
 Use this before publishing or cutting a release candidate.
+
+## Full-Confidence Gate
+
+Run:
+
+```bash
+scripts/full-confidence sodini-io 0.1.0
+```
+
+What it does:
+
+- runs `scripts/release-confidence`
+- runs `scripts/post-release-confidence`
+
+Use this when you want the strongest single launch gate in the repo:
+
+- fast/unit coverage
+- local box lifecycle confidence
+- published box confidence
+- published example Vagrantfile confidence
 
 Important gotchas:
 

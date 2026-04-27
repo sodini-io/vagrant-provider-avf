@@ -22,7 +22,7 @@ Shared provider behavior:
 - NAT networking plus localhost SSH port forwarding
 - one persisted SSH forwarding port per machine, reused across restarts when possible
 - Linux shared directories only, through AVF virtiofs
-- direct-kernel boot for the curated Ubuntu box
+- direct-kernel boot for the Ubuntu box
 - EFI disk boot plus a provider-generated NoCloud seed disk for AlmaLinux, Rocky, and future Linux cloud-image flows
 - explicit cleanup on `halt` and `destroy`
 
@@ -102,7 +102,7 @@ That prints the machine metadata, AVF start payload, helper log, console log, an
 - `bundle exec rspec` skips the hardware-backed acceptance specs unless `AVF_REAL_ACCEPTANCE=1` is set
 - the Ubuntu image build still depends on Docker with Linux ARM64 support
 - the AlmaLinux and Rocky image builds are host-native and depend on `qemu-img`
-- `scripts/smoke-box` uses the current `VAGRANT_HOME`
+- `scripts/verify-vagrant-commands` uses the current `VAGRANT_HOME`
 - `scripts/run-acceptance-ubuntu`, `scripts/run-acceptance-almalinux`, and `scripts/run-acceptance-rocky` create isolated `VAGRANT_HOME` directories
 - the Linux shared-folder path is AVF virtiofs only
 - the real smoke and acceptance flows expect the forwarded SSH port to stay stable across `halt` and a later `up`
@@ -139,7 +139,7 @@ scripts/publish-gem
 
 That builds the current `vagrant-provider-avf` gem under `build/gems/`, runs `scripts/release-confidence` by default, and pushes the gem to RubyGems.org.
 
-Today the publish path is intentionally limited to:
+Today the publish path is limited to:
 
 - Ubuntu
 - AlmaLinux
@@ -158,7 +158,7 @@ Low-effort additions worth keeping in play:
 - more example Vagrantfiles when we add real user-facing features
 - a single supported Linux CI matrix runner, which now exists as `scripts/ci-supported-linux`
 
-Still intentionally deferred:
+Still deferred:
 
 - snapshots
 - bridged networking

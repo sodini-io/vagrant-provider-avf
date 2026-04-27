@@ -141,7 +141,7 @@ vagrant ssh -c 'uname -a && whoami'
 
 ## Shared Folders And Tuning
 
-This is about as advanced as the supported surface gets today: more CPU and memory plus two read/write shared directories from the host into the guest.
+This is the largest supported example today: more CPU and memory plus two read/write shared directories from the host into the guest.
 
 ```ruby
 Vagrant.configure("2") do |config|
@@ -186,7 +186,7 @@ cat from-guest.txt
 - no bridged networking
 - no snapshots
 - no GUI path
-- no BSD guests in the active support matrix
+- no BSD guests right now
 
 ## Where To Go Next
 

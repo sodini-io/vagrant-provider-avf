@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+org_slug="${1:-${AVF_BOX_ORG:-}}"
+box_version="${2:-${AVF_BOX_VERSION:-}}"
+release_confidence_command="${AVF_RELEASE_CONFIDENCE_COMMAND:-${repo_root}/scripts/release-confidence}"
+post_release_confidence_command="${AVF_POST_RELEASE_CONFIDENCE_COMMAND:-${repo_root}/scripts/post-release-confidence}"
+
+if [[ -z "${org_slug}" || -z "${box_version}" ]]; then
+  echo "usage: full-confidence ORG_SLUG BOX_VERSION" >&2
+  exit 1
+fi
+
+"${release_confidence_command}"
+"${post_release_confidence_command}" "${org_slug}" "${box_version}"

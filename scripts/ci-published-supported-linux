@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
+org_slug="${1:-${AVF_BOX_ORG:-sodini-io}}"
+box_version="${2:-${AVF_BOX_VERSION:-0.1.0}}"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+matrix_root="${AVF_ACCEPTANCE_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/avf-public-linux.XXXXXX")}"
+verify_published_box_command="${AVF_VERIFY_PUBLISHED_BOX_COMMAND:-${repo_root}/scripts/verify-published-box}"
+
+cleanup() {
+  if [[ "${keep_failure_artifacts}" == "0" && -d "${matrix_root}" ]]; then
+    rm -rf "${matrix_root}"
+  fi
+}
+trap cleanup EXIT
+
+run_guest() {
+  local guest="$1"
+  local box_name="$2"
+  local guest_root="${matrix_root}/${guest}"
+
+  AVF_KEEP_FAILURE_ARTIFACTS="${keep_failure_artifacts}" \
+    AVF_ACCEPTANCE_ROOT="${guest_root}" \
+    "${verify_published_box_command}" "${box_name}" "${box_version}"
+}
+
+while IFS= read -r family; do
+  run_guest "${family}" "$(linux_cloud_box_name "${org_slug}" "${family}")"
+done < <(linux_supported_families)

@@ -1,8 +1,8 @@
+require_relative "supported_linux_box"
+
 module VagrantPlugins
   module AVF
     class ReleaseTarget
-      SUPPORTED_FAMILIES = ["ubuntu", "almalinux", "rocky"].freeze
-
       attr_reader :box_name
 
       def initialize(box_name)
@@ -10,7 +10,7 @@ module VagrantPlugins
       end
 
       def support_status
-        return :supported if SUPPORTED_FAMILIES.include?(family)
+        return :supported unless supported_linux_box.nil?
 
         :unknown
       end
@@ -21,15 +21,11 @@ module VagrantPlugins
         raise ArgumentError, publish_error_message
       end
 
+      def supported_linux_box
+        @supported_linux_box ||= SupportedLinuxBox.for_box_name(@box_name)
+      end
+
       private
-
-      def family
-        slug.split("-", 2).first
-      end
-
-      def slug
-        @box_name.split("/", 2).last.to_s
-      end
 
       def publish_error_message
         "#{@box_name} is not a supported release target"

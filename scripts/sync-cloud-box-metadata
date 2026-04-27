@@ -20,6 +20,7 @@ EOF
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/.." && pwd)"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
 organization="sodini-io"
 families=()
 
@@ -37,26 +38,15 @@ require_auth() {
 }
 
 validate_family() {
-  case "$1" in
-    ubuntu | almalinux | rocky) ;;
-    *)
-      printf 'unsupported family: %s\n' "$1" >&2
-      exit 1
-      ;;
-  esac
-}
-
-slug_for() {
-  case "$1" in
-    ubuntu) echo "ubuntu-24.04-arm64" ;;
-    almalinux) echo "almalinux-9-arm64" ;;
-    rocky) echo "rocky-9-arm64" ;;
-  esac
+  if ! linux_assert_supported_family "$1" >/dev/null 2>&1; then
+    printf 'unsupported family: %s\n' "$1" >&2
+    exit 1
+  fi
 }
 
 selected_families() {
   if [[ "${#families[@]}" -eq 0 ]]; then
-    printf 'ubuntu\nalmalinux\nrocky\n'
+    linux_supported_families
     return
   fi
 
@@ -75,14 +65,12 @@ metadata_json() {
 
 sync_family() {
   local family="$1"
-  local slug
   local box_name
   local metadata
   local short_description
   local description
 
-  slug="$(slug_for "${family}")"
-  box_name="${organization}/${slug}"
+  box_name="$(linux_cloud_box_name "${organization}" "${family}")"
   metadata="$(metadata_json "${box_name}")"
   short_description="$(ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("short_description")' <<<"${metadata}")"
   description="$(ruby -rjson -e 'print JSON.parse(STDIN.read).fetch("description")' <<<"${metadata}")"

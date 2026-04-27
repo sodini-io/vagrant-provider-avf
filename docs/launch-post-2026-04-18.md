@@ -10,26 +10,26 @@
 
 ## Excerpt
 
-Today I’m releasing `vagrant-provider-avf` `0.1.0`, a lean Vagrant provider for Apple Silicon Macs built on Apple’s `Virtualization.framework`. It brings a small, dependable Linux-first Vagrant workflow to native ARM64 Macs, with support for Ubuntu, AlmaLinux, and Rocky Linux.
+Today I’m releasing `vagrant-provider-avf` `0.1.0`, a Vagrant provider for Apple Silicon Macs built on Apple’s `Virtualization.framework`. It brings a practical Linux Vagrant workflow to native ARM64 Macs, with support for Ubuntu, AlmaLinux, and Rocky Linux.
 
 ## WordPress Post
 
-Today I’m releasing `vagrant-provider-avf` `0.1.0`, a lean Vagrant provider for Apple Silicon Macs built on Apple’s `Virtualization.framework`.
+Today I’m releasing `vagrant-provider-avf` `0.1.0`, a Vagrant provider for Apple Silicon Macs built on Apple’s `Virtualization.framework`.
 
-The goal of this project is simple: make Vagrant feel useful again on Apple Silicon without turning it into a giant VM platform or burying the implementation under layers of clever abstraction.
+The goal of this project is simple: make Vagrant useful on Apple Silicon without turning it into a giant VM platform or burying it under layers of abstraction.
 
-This first public release is intentionally narrow. It focuses on a small, dependable Linux-first workflow:
+This first public release is narrow on purpose. It focuses on a Linux workflow that is easy to explain and easy to support:
 
 - native `avf` provider support for Vagrant on Apple Silicon macOS
 - real lifecycle support for `up`, `halt`, `destroy`, `state`, and `ssh`
-- honest `ssh_info` over localhost port forwarding
+- `ssh_info` over localhost port forwarding
 - Linux shared folders through AVF `virtiofs`
-- curated ARM64 Linux box workflows for:
+- ARM64 Linux box workflows for:
   - Ubuntu 24.04.4
   - AlmaLinux 9
   - Rocky Linux 9
 
-What I wanted from this project was not a giant compatibility matrix or a half-finished GUI story. I wanted something boring in the best way: explicit, testable, readable, and actually pleasant to use for headless development workflows on Apple Silicon.
+I did not want a giant compatibility matrix or a half-finished GUI story. I wanted something explicit, testable, readable, and useful for headless development on Apple Silicon.
 
 That shaped a lot of the decisions in this release:
 
@@ -51,7 +51,7 @@ Apple Silicon machines are excellent developer hardware, but the Vagrant story h
 - simple box pipelines
 - a provider that does not feel like generated scaffolding
 
-I also wanted something that could be maintained without dread. That meant a project with hard boundaries, focused tests, explicit persistence, and minimal abstraction.
+I also wanted something I could maintain without dread. That meant hard boundaries, focused tests, explicit persistence, and minimal abstraction.
 
 ## What Works Today
 
@@ -71,7 +71,7 @@ Supported behavior today includes:
 - localhost SSH forwarding
 - read/write Linux shared folders through AVF `virtiofs`
 
-The provider uses Apple `Virtualization.framework` through a signed local helper. Boxes and the provider plugin are published separately, which keeps the release story more honest and easier to reason about.
+The provider uses Apple `Virtualization.framework` through a signed local helper. Boxes and the provider plugin are published separately, which keeps releases easier to reason about.
 
 ## Quickstart
 
@@ -115,7 +115,7 @@ I’m happy with where `0.1.0` landed.
 It is small.
 It is focused.
 It works on real Apple Silicon hardware.
-And it leaves plenty of room to improve Linux support further without pretending that every future feature needs to exist today.
+And it leaves room to improve Linux support without pretending every future feature already exists.
 
 If you try it, I’d love to hear how it goes.
 

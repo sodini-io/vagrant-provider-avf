@@ -1,0 +1,51 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "pathname"
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "vagrant_provider_avf/box_package"
+require "vagrant_provider_avf/supported_linux_box"
+
+family = ARGV.fetch(0) do
+  warn "usage: scripts/build-linux-box FAMILY"
+  exit 1
+end
+
+supported_box = VagrantPlugins::AVF::SupportedLinuxBox.fetch(family)
+repo_root = Pathname.new(File.expand_path("..", __dir__))
+artifact_dir = repo_root.join("build/images", supported_box.slug)
+output_dir = repo_root.join("build/boxes")
+private_key_path = repo_root.join("images/ubuntu/files/avf_insecure_key")
+release_file = artifact_dir.join("release.txt")
+release = ENV["BOX_RELEASE"] ||
+  ENV[supported_box.release_env_name] ||
+  (release_file.exist? ? release_file.read.strip : supported_box.default_release)
+kernel_path = artifact_dir.join("vmlinuz")
+initrd_path = artifact_dir.join("initrd.img")
+kernel_path = nil unless kernel_path.file?
+initrd_path = nil unless initrd_path.file?
+
+if supported_box.kernel_artifacts?
+  abort("vmlinuz and initrd.img must either both exist or both be absent") if kernel_path.nil? ^ initrd_path.nil?
+else
+  kernel_path = nil
+  initrd_path = nil
+end
+
+package = VagrantPlugins::AVF::BoxPackage.new(
+  name: ENV.fetch("BOX_NAME", supported_box.local_box_name),
+  version: ENV.fetch("BOX_VERSION", "0.1.0"),
+  release: release,
+  guest: :linux,
+  kernel_path: kernel_path,
+  initrd_path: initrd_path,
+  disk_image_path: artifact_dir.join("disk.img"),
+  private_key_path: private_key_path,
+  description: supported_box.package_description(release),
+  disk_gb: supported_box.default_disk_gb
+).validate!
+
+output_path = package.write_archive(output_dir: output_dir)
+package.write_checksum(output_path)
+puts output_path

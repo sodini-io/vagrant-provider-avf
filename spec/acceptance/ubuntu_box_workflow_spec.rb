@@ -2,7 +2,7 @@ require "open3"
 require "spec_helper"
 
 RSpec.describe "ubuntu box workflow", :real_acceptance do
-  it "boots, reconnects after restart, and destroys through vagrant" do
+  it "verifies the supported vagrant command flow end to end" do
     command = [File.expand_path("../../scripts/run-acceptance-ubuntu", __dir__)]
     stdout, stderr, status = Open3.capture3(*command)
 
@@ -14,5 +14,9 @@ RSpec.describe "ubuntu box workflow", :real_acceptance do
       stderr:
       #{stderr}
     MESSAGE
+    expect(stdout).to include("verified vagrant validate accepts the generated Vagrantfile")
+    expect(stdout).to include("verified vagrant up reaches running")
+    expect(stdout).to include("verified vagrant ssh reaches the guest")
+    expect(stdout).to include("verified vagrant destroy returns the machine to not_created")
   end
 end

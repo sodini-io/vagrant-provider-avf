@@ -14,14 +14,14 @@ RSpec.describe VagrantPlugins::AVF::CloudBoxMetadata do
     metadata = described_class.new("sodini-io/almalinux-9-arm64")
 
     expect(metadata.short_description).to eq("AlmaLinux 9 ARM64 for vagrant-provider-avf")
-    expect(metadata.description).to include("Curated AlmaLinux 9 ARM64 base box")
+    expect(metadata.description).to include("AlmaLinux 9 ARM64 base box")
   end
 
   it "builds rocky cloud metadata" do
     metadata = described_class.new("sodini-io/rocky-9-arm64")
 
     expect(metadata.short_description).to eq("Rocky Linux 9 ARM64 for vagrant-provider-avf")
-    expect(metadata.description).to include("Curated Rocky Linux 9 ARM64 base box")
+    expect(metadata.description).to include("Rocky Linux 9 ARM64 base box")
   end
 
   it "rejects an unsupported target" do

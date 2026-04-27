@@ -248,9 +248,43 @@ The lowest-risk upstream sequence is:
 5. repeat the same unreleased-then-release flow for AlmaLinux
 6. repeat it for Rocky Linux
 
+The repo now includes explicit wrappers for that clean-user verification:
+
+```bash
+scripts/verify-published-box sodini-io/ubuntu-24.04-arm64 0.1.0
+scripts/verify-published-box sodini-io/almalinux-9-arm64 0.1.0
+scripts/verify-published-box sodini-io/rocky-9-arm64 0.1.0
+```
+
+Or, once all three are released:
+
+```bash
+scripts/ci-published-supported-linux sodini-io 0.1.0
+```
+
+And to verify the published example Vagrantfiles against those released artifacts:
+
+```bash
+scripts/ci-published-examples sodini-io 0.1.0
+```
+
+If you want the same check wrapped as an acceptance run:
+
+```bash
+scripts/post-release-confidence sodini-io 0.1.0
+```
+
+That post-release lane is the strongest check in the repo because it uses a clean `VAGRANT_HOME`, installs the published RubyGems plugin, downloads the released boxes from the registry, runs the full Vagrant lifecycle verifier, and proves the published example Vagrantfiles still work as documented.
+
+If you want one literal top-level go/no-go command once the release is public:
+
+```bash
+scripts/full-confidence sodini-io 0.1.0
+```
+
 Why this order:
 
-- Ubuntu is the smallest curated path and the easiest first public support story
+- Ubuntu is the smallest path and the easiest first public release
 - AlmaLinux and Rocky already clear the same real acceptance bar locally, but publishing them after Ubuntu keeps the first registry rollout simpler
 - Vagrant Cloud and HCP Vagrant Registry both support unreleased versions, so we can stage uploads before making them active
 

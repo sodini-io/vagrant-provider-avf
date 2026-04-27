@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+org_slug="${1:-${AVF_BOX_ORG:-sodini-io}}"
+box_version="${2:-${AVF_BOX_VERSION:-0.1.0}}"
+
+export AVF_REAL_PUBLISHED_ACCEPTANCE=1
+export AVF_BOX_ORG="${org_slug}"
+export AVF_BOX_VERSION="${box_version}"
+
+cd "${repo_root}"
+bundle exec rspec \
+  spec/acceptance/published_linux_workflow_spec.rb \
+  spec/acceptance/published_examples_workflow_spec.rb

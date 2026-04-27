@@ -2,7 +2,31 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-boxes_dir="${repo_root}/build/boxes"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
+images_dir="${AVF_RELEASE_CONFIDENCE_IMAGES_DIR:-${repo_root}/build/images}"
+boxes_dir="${AVF_RELEASE_CONFIDENCE_BOXES_DIR:-${repo_root}/build/boxes}"
+build_box_command="${AVF_BUILD_BOX_COMMAND:-scripts/build-box}"
+build_almalinux_box_command="${AVF_BUILD_ALMALINUX_BOX_COMMAND:-scripts/build-almalinux-box}"
+build_rocky_box_command="${AVF_BUILD_ROCKY_BOX_COMMAND:-scripts/build-rocky-box}"
+ci_supported_linux_command="${AVF_CI_SUPPORTED_LINUX_COMMAND:-scripts/ci-supported-linux}"
+
+verify_local_image_artifacts() {
+  local missing=()
+  local artifact
+  local family
+
+  while IFS= read -r family; do
+    artifact="${images_dir}/$(linux_slug_for_family "${family}")/disk.img"
+    [[ -f "${artifact}" ]] || missing+=("${artifact}")
+  done < <(linux_supported_families)
+
+  if [[ "${#missing[@]}" -gt 0 ]]; then
+    printf 'release-confidence requires local image artifacts before it can rebuild boxes:\n' >&2
+    printf '  %s\n' "${missing[@]}" >&2
+    printf 'rebuild the local images first, or run scripts/post-release-confidence ORG_SLUG BOX_VERSION to verify the published release path\n' >&2
+    exit 1
+  fi
+}
 
 verify_artifact() {
   local path="$1"
@@ -19,16 +43,23 @@ verify_artifact() {
   }
 }
 
+verify_family_artifacts() {
+  local family="$1"
+
+  verify_artifact "${boxes_dir}/avf-$(linux_slug_for_family "${family}")-0.1.0.box"
+}
+
 cd "${repo_root}"
 
 bundle exec rspec
+verify_local_image_artifacts
 
-scripts/build-box
-scripts/build-almalinux-box
-scripts/build-rocky-box
+"${build_box_command}"
+"${build_almalinux_box_command}"
+"${build_rocky_box_command}"
 
-verify_artifact "${boxes_dir}/avf-ubuntu-24.04-arm64-0.1.0.box"
-verify_artifact "${boxes_dir}/avf-almalinux-9-arm64-0.1.0.box"
-verify_artifact "${boxes_dir}/avf-rocky-9-arm64-0.1.0.box"
+while IFS= read -r family; do
+  verify_family_artifacts "${family}"
+done < <(linux_supported_families)
 
-scripts/ci-supported-linux
+"${ci_supported_linux_command}"

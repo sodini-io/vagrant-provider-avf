@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
+
+family="${1:-}"
+shift || true
+
+if [[ -z "${family}" ]]; then
+  echo "usage: run-acceptance-linux FAMILY [BOX_PATH]" >&2
+  exit 1
+fi
+
+linux_assert_supported_family "${family}" || exit 1
+
+gem_output_dir="${repo_root}/build/gems"
+default_box_path="$(linux_default_box_path "${repo_root}" "${family}")"
+box_path="${1:-${default_box_path}}"
+artifact_dir="$(linux_artifact_dir "${repo_root}" "${family}")"
+build_image_command="$(linux_build_image_command "${repo_root}" "${family}")"
+build_box_command="$(linux_build_box_command "${repo_root}" "${family}")"
+box_name="$(linux_box_name "${family}")"
+version="$(cd "${repo_root}" && ruby -I "${repo_root}/lib" -e 'require "vagrant_provider_avf/version"; print VagrantPlugins::AVF::VERSION')"
+plugin_gem="${gem_output_dir}/vagrant-provider-avf-${version}.gem"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+acceptance_root="${AVF_ACCEPTANCE_ROOT:-}"
+
+have_local_artifacts() {
+  case "${family}" in
+    ubuntu)
+      [[ -f "${artifact_dir}/disk.img" ]] &&
+        [[ -f "${artifact_dir}/initrd.img" ]] &&
+        [[ -f "${artifact_dir}/vmlinuz" ]] &&
+        [[ -f "${artifact_dir}/release.txt" ]]
+      ;;
+    *)
+      [[ -f "${artifact_dir}/disk.img" ]] &&
+        [[ -f "${artifact_dir}/release.txt" ]]
+      ;;
+  esac
+}
+
+ensure_box() {
+  if [[ -f "${box_path}" ]]; then
+    return
+  fi
+
+  if [[ "${box_path}" != "${default_box_path}" ]]; then
+    echo "${family} box file does not exist: ${box_path}" >&2
+    exit 1
+  fi
+
+  if ! have_local_artifacts; then
+    eval "${build_image_command}"
+  fi
+
+  eval "${build_box_command}"
+}
+
+if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
+  echo "real acceptance requires macOS on Apple Silicon" >&2
+  exit 1
+fi
+
+if ! command -v vagrant >/dev/null 2>&1; then
+  echo "vagrant is required for real acceptance" >&2
+  exit 1
+fi
+
+if ! command -v xcrun >/dev/null 2>&1; then
+  echo "xcrun is required so the provider can build its local AVF helper" >&2
+  exit 1
+fi
+
+mkdir -p "${gem_output_dir}"
+(cd "${repo_root}" && gem build vagrant-provider-avf.gemspec --output "${plugin_gem}" >/dev/null)
+ensure_box
+
+if [[ -n "${acceptance_root}" ]]; then
+  mkdir -p "${acceptance_root}"
+  acceptance_root="$(cd "${acceptance_root}" && pwd)"
+  rm -rf "${acceptance_root}"
+  mkdir -p "${acceptance_root}"
+else
+  acceptance_root="$(mktemp -d)"
+fi
+
+vagrant_home="${acceptance_root}/home"
+smoke_work_dir="${acceptance_root}/work"
+mkdir -p "${vagrant_home}" "${smoke_work_dir}"
+
+cleanup() {
+  status=$?
+
+  if [[ "${status}" -ne 0 && "${keep_failure_artifacts}" == "1" ]]; then
+    echo "preserving acceptance artifacts in ${acceptance_root}" >&2
+    return
+  fi
+
+  rm -rf "${acceptance_root}"
+}
+trap cleanup EXIT
+
+export VAGRANT_HOME="${vagrant_home}"
+export SMOKE_WORK_DIR="${smoke_work_dir}"
+export BOX_NAME="${box_name}"
+export DISK_GB="${DISK_GB:-$(linux_default_disk_gb_for_box "${box_name}")}"
+
+vagrant plugin install "${plugin_gem}"
+"${repo_root}/scripts/verify-vagrant-commands" "${box_path}"

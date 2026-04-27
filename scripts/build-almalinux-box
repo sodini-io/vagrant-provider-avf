@@ -1,31 +1,4 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-require "pathname"
-
-$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
-require "vagrant_provider_avf/box_package"
-
-repo_root = Pathname.new(File.expand_path("..", __dir__))
-artifact_dir = repo_root.join("build/images/almalinux-9-arm64")
-output_dir = repo_root.join("build/boxes")
-private_key_path = repo_root.join("images/ubuntu/files/avf_insecure_key")
-release_file = artifact_dir.join("release.txt")
-release = release_file.exist? ? release_file.read.strip : "9"
-
-package = VagrantPlugins::AVF::BoxPackage.new(
-  name: ENV.fetch("BOX_NAME", "avf/almalinux-9-arm64"),
-  version: ENV.fetch("BOX_VERSION", "0.1.0"),
-  release: release,
-  guest: :linux,
-  kernel_path: nil,
-  initrd_path: nil,
-  disk_image_path: artifact_dir.join("disk.img"),
-  private_key_path: private_key_path,
-  description: "Minimal AlmaLinux #{release} ARM64 base box for vagrant-provider-avf",
-  disk_gb: 12
-).validate!
-
-output_path = package.write_archive(output_dir: output_dir)
-package.write_checksum(output_path)
-puts output_path
+exec(File.expand_path("build-linux-box", __dir__), "almalinux")

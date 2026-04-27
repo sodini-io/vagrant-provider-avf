@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+org_slug="${1:-${AVF_BOX_ORG:-sodini-io}}"
+box_version="${2:-${AVF_BOX_VERSION:-0.1.0}}"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+matrix_root="${AVF_ACCEPTANCE_ROOT:-$(mktemp -d "${TMPDIR:-/tmp}/avf-published-examples.XXXXXX")}"
+verify_example_command="${AVF_VERIFY_EXAMPLE_VAGRANTFILE_COMMAND:-${repo_root}/scripts/verify-example-vagrantfile}"
+
+cleanup() {
+  if [[ "${keep_failure_artifacts}" == "0" && -d "${matrix_root}" ]]; then
+    rm -rf "${matrix_root}"
+  fi
+}
+trap cleanup EXIT
+
+run_example() {
+  local name="$1"
+  local path="$2"
+
+  AVF_KEEP_FAILURE_ARTIFACTS="${keep_failure_artifacts}" \
+    AVF_ACCEPTANCE_ROOT="${matrix_root}/${name}" \
+    "${verify_example_command}" "${path}" "${org_slug}" "${box_version}"
+}
+
+run_example ubuntu-minimal "${repo_root}/examples/ubuntu-minimal"
+run_example almalinux "${repo_root}/examples/almalinux"
+run_example rocky "${repo_root}/examples/rocky"
+run_example shared-folders "${repo_root}/examples/shared-folders"

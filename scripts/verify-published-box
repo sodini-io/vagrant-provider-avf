@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${repo_root}/scripts/lib/linux-boxes.sh"
+box_name="${1:-}"
+box_version="${2:-0.1.0}"
+plugin_name="${VERIFY_PUBLISHED_PLUGIN_NAME:-vagrant-provider-avf}"
+plugin_version="${VERIFY_PUBLISHED_PLUGIN_VERSION:-}"
+keep_failure_artifacts="${AVF_KEEP_FAILURE_ARTIFACTS:-0}"
+acceptance_root="${AVF_ACCEPTANCE_ROOT:-}"
+verify_command="${AVF_VERIFY_VAGRANT_COMMANDS_COMMAND:-${repo_root}/scripts/verify-vagrant-commands}"
+
+if [[ -z "${box_name}" ]]; then
+  echo "usage: verify-published-box BOX_NAME [BOX_VERSION]" >&2
+  exit 1
+fi
+
+if ! command -v vagrant >/dev/null 2>&1; then
+  echo "vagrant is required for published box verification" >&2
+  exit 1
+fi
+
+if ! command -v xcrun >/dev/null 2>&1; then
+  echo "xcrun is required so the provider can build its local AVF helper" >&2
+  exit 1
+fi
+
+if [[ -n "${acceptance_root}" ]]; then
+  mkdir -p "${acceptance_root}"
+  acceptance_root="$(cd "${acceptance_root}" && pwd)"
+  rm -rf "${acceptance_root}"
+  mkdir -p "${acceptance_root}"
+else
+  acceptance_root="$(mktemp -d)"
+fi
+
+vagrant_home="${acceptance_root}/home"
+work_dir="${acceptance_root}/work"
+mkdir -p "${vagrant_home}" "${work_dir}"
+
+cleanup() {
+  status=$?
+
+  if [[ "${status}" -ne 0 && "${keep_failure_artifacts}" == "1" ]]; then
+    echo "preserving published verification artifacts in ${acceptance_root}" >&2
+    return
+  fi
+
+  rm -rf "${acceptance_root}"
+}
+trap cleanup EXIT
+
+export VAGRANT_HOME="${vagrant_home}"
+export VERIFY_VAGRANT_COMMANDS_WORK_DIR="${work_dir}"
+export VERIFY_VAGRANT_COMMANDS_SKIP_BOX_ADD=1
+export BOX_NAME="${box_name}"
+export DISK_GB="${DISK_GB:-$(linux_default_disk_gb_for_box "${box_name}")}"
+
+if [[ -n "${plugin_version}" ]]; then
+  vagrant plugin install "${plugin_name}" --plugin-version "${plugin_version}"
+else
+  vagrant plugin install "${plugin_name}"
+fi
+
+if ! vagrant plugin list | grep -q "^${plugin_name} "; then
+  echo "vagrant plugin install did not make ${plugin_name} available" >&2
+  exit 1
+fi
+
+echo "verified vagrant plugin install provides ${plugin_name}"
+vagrant box add "${box_name}" --provider avf --box-version "${box_version}"
+echo "verified vagrant box add fetches ${box_name} ${box_version}"
+echo "verified published verification uses disk_gb ${DISK_GB} for ${box_name}"
+"${verify_command}"

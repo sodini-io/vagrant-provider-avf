@@ -34,7 +34,7 @@ That gives you the best of both worlds:
 
 ## Suggested Meta Description
 
-`vagrant-provider-avf is a lean Vagrant provider for Apple Silicon Macs using Apple Virtualization.framework, with native ARM64 Linux support for Ubuntu, AlmaLinux, and Rocky Linux.`
+`vagrant-provider-avf is a Vagrant provider for Apple Silicon Macs using Apple Virtualization.framework, with ARM64 Linux support for Ubuntu, AlmaLinux, and Rocky Linux.`
 
 ## Suggested Page Structure
 
@@ -46,9 +46,9 @@ That gives you the best of both worlds:
 
 ## Suggested Page Copy
 
-`vagrant-provider-avf` is a lean Vagrant provider for Apple Silicon Macs using Apple’s `Virtualization.framework`.
+`vagrant-provider-avf` is a Vagrant provider for Apple Silicon Macs using Apple’s `Virtualization.framework`.
 
-It is built for small, dependable ARM64 Linux workflows on macOS, with support today for:
+It is built for ARM64 Linux workflows on macOS, with support today for:
 
 - Ubuntu 24.04.4
 - AlmaLinux 9
@@ -102,4 +102,4 @@ end
 
 ## Short Version For A Future Open Source Index
 
-`vagrant-provider-avf` is a lean Vagrant provider for Apple Silicon Macs built on Apple `Virtualization.framework`. It supports ARM64 Linux workflows for Ubuntu, AlmaLinux, and Rocky Linux with real lifecycle support, localhost SSH access, and Linux shared folders.
+`vagrant-provider-avf` is a Vagrant provider for Apple Silicon Macs built on Apple `Virtualization.framework`. It supports ARM64 Linux workflows for Ubuntu, AlmaLinux, and Rocky Linux with lifecycle support, localhost SSH access, and Linux shared folders.

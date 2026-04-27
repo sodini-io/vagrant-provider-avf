@@ -20,6 +20,12 @@ RSpec.describe "example Vagrantfiles" do
     expect(examples_root.join("rocky/Vagrantfile").read).to include("avf.disk_gb = 12")
   end
 
+  it "keeps every example self-describing about which box it targets" do
+    examples_root.glob("*/Vagrantfile").sort.each do |path|
+      expect(path.read).to match(/config\.vm\.box\s*=\s*"[^"]+"/)
+    end
+  end
+
   it "documents the Linux shared-folder feature surface" do
     content = examples_root.join("shared-folders/Vagrantfile").read
 
